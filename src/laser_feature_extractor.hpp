@@ -67,7 +67,7 @@ class Laser_feature
   public:
     const double m_para_scanPeriod = 0.1;
 
-    int m_if_pub_debug_feature = 1;
+    int m_if_pub_debug_feature = 1; // TODO: ???
 
     const int   m_para_system_delay = 2;
     int         m_para_system_init_count = 0;
@@ -175,6 +175,7 @@ class Laser_feature
         init_ros_env();
     };
 
+    // 根据最近距离的阈值（eg. 0.01m）,移除距离相隔太近的点。
     template <typename PointT>
     void removeClosedPointCloud( const pcl::PointCloud<PointT> &cloud_in,
                                  pcl::PointCloud<PointT> &cloud_out, float thres )
@@ -206,10 +207,12 @@ class Laser_feature
         cloud_out.is_dense = true;
     }
 
+    // Lidar数据的回调函数，处理单帧lidar数据。
     void laserCloudHandler( const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg )
     {
         std::vector<pcl::PointCloud<PointType>> laserCloudScans( m_laser_scan_number );
 
+        // 系统延迟一段时间，再开始处理lidar数据。
         if ( !m_para_systemInited )
         {
             m_para_system_init_count++;
@@ -235,6 +238,7 @@ class Laser_feature
 
         size_t cloudSize = laserCloudIn.points.size();
 
+        // 将点云分线到不同的laserCloudScans。livox和传统velodyne的方式有所不同。
         if ( m_lidar_type ) // Livox scans
         {
             //printf_line;
@@ -336,8 +340,9 @@ class Laser_feature
             }
             return;
         }
-        else
+        else // Velodyne scans
         {
+            // 这一else部分的特征提取代码，是直接从原版的loam代码复制过来的。
             /********************************************
              *    Feature extraction for velodyne lidar *
             ********************************************/
