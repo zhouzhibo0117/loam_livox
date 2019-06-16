@@ -458,321 +458,324 @@ class Laser_feature
             //printf( "points size %d \n", cloudSize );
         }
 
-        pcl::PointCloud<PointType>::Ptr laserCloud( new pcl::PointCloud<PointType>() );
-        laserCloud->clear();
-        cloudSize = 0;
-        for ( int i = 0; i < m_laser_scan_number; i++ )
-        {
-            scanStartInd[ i ] = laserCloud->size() + 5;
-            //*laserCloud += laserCloudScans[ laserCloudScans.size() - N_SCANS + i ];
-            *laserCloud += laserCloudScans[ i ];
-            scanEndInd[ i ] = laserCloud->size() - 6;
-            //cloudSize += laserCloudScans[ laserCloudScans.size() - N_SCANS + i ].size();
-            cloudSize += laserCloudScans[ i ].size();
-        }
-        //printf_line;
+// 以下大部分内容与livox无关，是针对原版velodyne的lidar的。
+////////////////************************************* 以下注释毫无影响 ******************************* //////////////////
+//         pcl::PointCloud<PointType>::Ptr laserCloud( new pcl::PointCloud<PointType>() );
+//         laserCloud->clear();
+//         cloudSize = 0;
+//         for ( int i = 0; i < m_laser_scan_number; i++ )
+//         {
+//             scanStartInd[ i ] = laserCloud->size() + 5;
+//             //*laserCloud += laserCloudScans[ laserCloudScans.size() - N_SCANS + i ];
+//             *laserCloud += laserCloudScans[ i ];
+//             scanEndInd[ i ] = laserCloud->size() - 6;
+//             //cloudSize += laserCloudScans[ laserCloudScans.size() - N_SCANS + i ].size();
+//             cloudSize += laserCloudScans[ i ].size();
+//         }
+//         //printf_line;
 
-        for ( size_t i = 5; i < cloudSize - 5; i++ )
-        {
-            // assert( laserCloud->points[ i - 5 ].x != 0 );
-            float diffX = laserCloud->points[ i - 5 ].x + laserCloud->points[ i - 4 ].x + laserCloud->points[ i - 3 ].x + laserCloud->points[ i - 2 ].x + laserCloud->points[ i - 1 ].x - 10 * laserCloud->points[ i ].x + laserCloud->points[ i + 1 ].x + laserCloud->points[ i + 2 ].x + laserCloud->points[ i + 3 ].x + laserCloud->points[ i + 4 ].x + laserCloud->points[ i + 5 ].x;
-            float diffY = laserCloud->points[ i - 5 ].y + laserCloud->points[ i - 4 ].y + laserCloud->points[ i - 3 ].y + laserCloud->points[ i - 2 ].y + laserCloud->points[ i - 1 ].y - 10 * laserCloud->points[ i ].y + laserCloud->points[ i + 1 ].y + laserCloud->points[ i + 2 ].y + laserCloud->points[ i + 3 ].y + laserCloud->points[ i + 4 ].y + laserCloud->points[ i + 5 ].y;
-            float diffZ = laserCloud->points[ i - 5 ].z + laserCloud->points[ i - 4 ].z + laserCloud->points[ i - 3 ].z + laserCloud->points[ i - 2 ].z + laserCloud->points[ i - 1 ].z - 10 * laserCloud->points[ i ].z + laserCloud->points[ i + 1 ].z + laserCloud->points[ i + 2 ].z + laserCloud->points[ i + 3 ].z + laserCloud->points[ i + 4 ].z + laserCloud->points[ i + 5 ].z;
-            float diff = diffX * diffX + diffY * diffY + diffZ * diffZ;
-            m_pc_curvature[ i ] = diff;
-            m_pc_sort_idx[ i ] = i;
-            m_pc_neighbor_picked[ i ] = 0;
-            m_pc_cloud_label[ i ] = 0;
-            if ( 1 )
-            {
-                if ( 1 )
-                {
-                    if ( diff > 0.1 )
-                    {
-                        float depth1 = sqrt( laserCloud->points[ i ].x * laserCloud->points[ i ].x +
-                                             laserCloud->points[ i ].y * laserCloud->points[ i ].y +
-                                             laserCloud->points[ i ].z * laserCloud->points[ i ].z );
-                        float depth2 = sqrt( laserCloud->points[ i + 1 ].x * laserCloud->points[ i + 1 ].x +
-                                             laserCloud->points[ i + 1 ].y * laserCloud->points[ i + 1 ].y +
-                                             laserCloud->points[ i + 1 ].z * laserCloud->points[ i + 1 ].z );
+//         for ( size_t i = 5; i < cloudSize - 5; i++ )
+//         {
+//             // assert( laserCloud->points[ i - 5 ].x != 0 );
+//             float diffX = laserCloud->points[ i - 5 ].x + laserCloud->points[ i - 4 ].x + laserCloud->points[ i - 3 ].x + laserCloud->points[ i - 2 ].x + laserCloud->points[ i - 1 ].x - 10 * laserCloud->points[ i ].x + laserCloud->points[ i + 1 ].x + laserCloud->points[ i + 2 ].x + laserCloud->points[ i + 3 ].x + laserCloud->points[ i + 4 ].x + laserCloud->points[ i + 5 ].x;
+//             float diffY = laserCloud->points[ i - 5 ].y + laserCloud->points[ i - 4 ].y + laserCloud->points[ i - 3 ].y + laserCloud->points[ i - 2 ].y + laserCloud->points[ i - 1 ].y - 10 * laserCloud->points[ i ].y + laserCloud->points[ i + 1 ].y + laserCloud->points[ i + 2 ].y + laserCloud->points[ i + 3 ].y + laserCloud->points[ i + 4 ].y + laserCloud->points[ i + 5 ].y;
+//             float diffZ = laserCloud->points[ i - 5 ].z + laserCloud->points[ i - 4 ].z + laserCloud->points[ i - 3 ].z + laserCloud->points[ i - 2 ].z + laserCloud->points[ i - 1 ].z - 10 * laserCloud->points[ i ].z + laserCloud->points[ i + 1 ].z + laserCloud->points[ i + 2 ].z + laserCloud->points[ i + 3 ].z + laserCloud->points[ i + 4 ].z + laserCloud->points[ i + 5 ].z;
+//             float diff = diffX * diffX + diffY * diffY + diffZ * diffZ;
+//             m_pc_curvature[ i ] = diff;
+//             m_pc_sort_idx[ i ] = i;
+//             m_pc_neighbor_picked[ i ] = 0;
+//             m_pc_cloud_label[ i ] = 0;
+//             if ( 1 )
+//             {
+//                 if ( 1 )
+//                 {
+//                     if ( diff > 0.1 )
+//                     {
+//                         float depth1 = sqrt( laserCloud->points[ i ].x * laserCloud->points[ i ].x +
+//                                              laserCloud->points[ i ].y * laserCloud->points[ i ].y +
+//                                              laserCloud->points[ i ].z * laserCloud->points[ i ].z );
+//                         float depth2 = sqrt( laserCloud->points[ i + 1 ].x * laserCloud->points[ i + 1 ].x +
+//                                              laserCloud->points[ i + 1 ].y * laserCloud->points[ i + 1 ].y +
+//                                              laserCloud->points[ i + 1 ].z * laserCloud->points[ i + 1 ].z );
 
-                        if ( depth1 > depth2 )
-                        {
-                            diffX = laserCloud->points[ i + 1 ].x - laserCloud->points[ i ].x * depth2 / depth1;
-                            diffY = laserCloud->points[ i + 1 ].y - laserCloud->points[ i ].y * depth2 / depth1;
-                            diffZ = laserCloud->points[ i + 1 ].z - laserCloud->points[ i ].z * depth2 / depth1;
+//                         if ( depth1 > depth2 )
+//                         {
+//                             diffX = laserCloud->points[ i + 1 ].x - laserCloud->points[ i ].x * depth2 / depth1;
+//                             diffY = laserCloud->points[ i + 1 ].y - laserCloud->points[ i ].y * depth2 / depth1;
+//                             diffZ = laserCloud->points[ i + 1 ].z - laserCloud->points[ i ].z * depth2 / depth1;
 
-                            if ( sqrt( diffX * diffX + diffY * diffY + diffZ * diffZ ) / depth2 < 0.1 )
-                            {
-                                m_pc_neighbor_picked[ i - 5 ] = 1;
-                                m_pc_neighbor_picked[ i - 4 ] = 1;
-                                m_pc_neighbor_picked[ i - 3 ] = 1;
-                                m_pc_neighbor_picked[ i - 2 ] = 1;
-                                m_pc_neighbor_picked[ i - 1 ] = 1;
-                                m_pc_neighbor_picked[ i ] = 1;
-                            }
-                        }
-                        else
-                        {
-                            diffX = laserCloud->points[ i + 1 ].x * depth1 / depth2 - laserCloud->points[ i ].x;
-                            diffY = laserCloud->points[ i + 1 ].y * depth1 / depth2 - laserCloud->points[ i ].y;
-                            diffZ = laserCloud->points[ i + 1 ].z * depth1 / depth2 - laserCloud->points[ i ].z;
+//                             if ( sqrt( diffX * diffX + diffY * diffY + diffZ * diffZ ) / depth2 < 0.1 )
+//                             {
+//                                 m_pc_neighbor_picked[ i - 5 ] = 1;
+//                                 m_pc_neighbor_picked[ i - 4 ] = 1;
+//                                 m_pc_neighbor_picked[ i - 3 ] = 1;
+//                                 m_pc_neighbor_picked[ i - 2 ] = 1;
+//                                 m_pc_neighbor_picked[ i - 1 ] = 1;
+//                                 m_pc_neighbor_picked[ i ] = 1;
+//                             }
+//                         }
+//                         else
+//                         {
+//                             diffX = laserCloud->points[ i + 1 ].x * depth1 / depth2 - laserCloud->points[ i ].x;
+//                             diffY = laserCloud->points[ i + 1 ].y * depth1 / depth2 - laserCloud->points[ i ].y;
+//                             diffZ = laserCloud->points[ i + 1 ].z * depth1 / depth2 - laserCloud->points[ i ].z;
 
-                            if ( sqrt( diffX * diffX + diffY * diffY + diffZ * diffZ ) / depth1 < 0.1 )
-                            {
-                                m_pc_neighbor_picked[ i + 1 ] = 1;
-                                m_pc_neighbor_picked[ i + 2 ] = 1;
-                                m_pc_neighbor_picked[ i + 3 ] = 1;
-                                m_pc_neighbor_picked[ i + 4 ] = 1;
-                                m_pc_neighbor_picked[ i + 5 ] = 1;
-                                m_pc_neighbor_picked[ i + 6 ] = 1;
-                            }
-                        }
-                    }
-                }
+//                             if ( sqrt( diffX * diffX + diffY * diffY + diffZ * diffZ ) / depth1 < 0.1 )
+//                             {
+//                                 m_pc_neighbor_picked[ i + 1 ] = 1;
+//                                 m_pc_neighbor_picked[ i + 2 ] = 1;
+//                                 m_pc_neighbor_picked[ i + 3 ] = 1;
+//                                 m_pc_neighbor_picked[ i + 4 ] = 1;
+//                                 m_pc_neighbor_picked[ i + 5 ] = 1;
+//                                 m_pc_neighbor_picked[ i + 6 ] = 1;
+//                             }
+//                         }
+//                     }
+//                 }
 
-                if ( 1 )
-                {
-                    float diffX2 = laserCloud->points[ i ].x - laserCloud->points[ i - 1 ].x;
-                    float diffY2 = laserCloud->points[ i ].y - laserCloud->points[ i - 1 ].y;
-                    float diffZ2 = laserCloud->points[ i ].z - laserCloud->points[ i - 1 ].z;
-                    float diff2 = diffX2 * diffX2 + diffY2 * diffY2 + diffZ2 * diffZ2;
+//                 if ( 1 )
+//                 {
+//                     float diffX2 = laserCloud->points[ i ].x - laserCloud->points[ i - 1 ].x;
+//                     float diffY2 = laserCloud->points[ i ].y - laserCloud->points[ i - 1 ].y;
+//                     float diffZ2 = laserCloud->points[ i ].z - laserCloud->points[ i - 1 ].z;
+//                     float diff2 = diffX2 * diffX2 + diffY2 * diffY2 + diffZ2 * diffZ2;
 
-                    float dis = laserCloud->points[ i ].x * laserCloud->points[ i ].x + laserCloud->points[ i ].y * laserCloud->points[ i ].y + laserCloud->points[ i ].z * laserCloud->points[ i ].z;
+//                     float dis = laserCloud->points[ i ].x * laserCloud->points[ i ].x + laserCloud->points[ i ].y * laserCloud->points[ i ].y + laserCloud->points[ i ].z * laserCloud->points[ i ].z;
 
-                    if ( diff > 0.0002 * dis && diff2 > 0.0002 * dis )
-                    {
-                        m_pc_neighbor_picked[ i ] = 1;
-                    }
-                }
-            }
-        }
-//printf_line;
+//                     if ( diff > 0.0002 * dis && diff2 > 0.0002 * dis )
+//                     {
+//                         m_pc_neighbor_picked[ i ] = 1;
+//                     }
+//                 }
+//             }
+//         }
+// //printf_line;
 
-#if !IF_LIVOX_HANDLER_REMOVE
-        if ( m_lidar_type != 0 )
-        //if(1)
-        {
-            Livox_laser::Pt_infos *pt_info;
-            for ( unsigned int idx = 0; idx < cloudSize; idx++ )
-            {
-                //printf( "Idx = %d, size = %d, pt = [%f,%f,%f]\r\n", idx, cloudSize, laserCloud->points[ idx ].x, laserCloud->points[ idx ].y, laserCloud->points[ idx ].z );
-                // printf( "Idx = %d, pt = [%f,%f,%f]\r\n", idx, 1.0,2.0,3.0 );
-                pt_info = m_livox.find_pt_info( laserCloud->points[ idx ] );
+// #if !IF_LIVOX_HANDLER_REMOVE
+//         if ( m_lidar_type != 0 )
+//         //if(1)
+//         {
+//             Livox_laser::Pt_infos *pt_info;
+//             for ( unsigned int idx = 0; idx < cloudSize; idx++ )
+//             {
+//                 //printf( "Idx = %d, size = %d, pt = [%f,%f,%f]\r\n", idx, cloudSize, laserCloud->points[ idx ].x, laserCloud->points[ idx ].y, laserCloud->points[ idx ].z );
+//                 // printf( "Idx = %d, pt = [%f,%f,%f]\r\n", idx, 1.0,2.0,3.0 );
+//                 pt_info = m_livox.find_pt_info( laserCloud->points[ idx ] );
 
-                if ( pt_info->pt_type != Livox_laser::e_pt_normal )
-                {
-                    //std::cout << "Reject, id = "<<idx << " ---, type = " << livox.m_mask_pointtype[idx] <<std::endl;
-                    m_pc_neighbor_picked[ idx ] = 1;
-                }
-            }
-        }
-//printf_line;
-#endif
+//                 if ( pt_info->pt_type != Livox_laser::e_pt_normal )
+//                 {
+//                     //std::cout << "Reject, id = "<<idx << " ---, type = " << livox.m_mask_pointtype[idx] <<std::endl;
+//                     m_pc_neighbor_picked[ idx ] = 1;
+//                 }
+//             }
+//         }
+// //printf_line;
+// #endif
 
-        //printf_line;
+//         //printf_line;
 
-        pcl::PointCloud<PointType> cornerPointsSharp;
-        pcl::PointCloud<PointType> cornerPointsLessSharp;
-        pcl::PointCloud<PointType> surfPointsFlat;
-        pcl::PointCloud<PointType> surfPointsLessFlat;
-        float                      sharp_point_threshold = 0.05;
+//         pcl::PointCloud<PointType> cornerPointsSharp;
+//         pcl::PointCloud<PointType> cornerPointsLessSharp;
+//         pcl::PointCloud<PointType> surfPointsFlat;
+//         pcl::PointCloud<PointType> surfPointsLessFlat;
+//         float                      sharp_point_threshold = 0.05;
 
-        //extract corners points and surface points
-        for ( int i = 0; i < m_laser_scan_number; i++ )
-        {
-            pcl::PointCloud<PointType>::Ptr surfPointsLessFlatScan( new pcl::PointCloud<PointType> );
-            // To ensure the distribution of features point, spilt each scan into 6 parts equally according to their curvature.
-            for ( int j = 0; j < 6; j++ )
-            {
-                //Starting of each sub-scan.
-                int sp = ( scanStartInd[ i ] * ( 6 - j ) + scanEndInd[ i ] * j ) / 6;
-                //Ending of each sub-scan.
-                int ep = ( scanStartInd[ i ] * ( 5 - j ) + scanEndInd[ i ] * ( j + 1 ) ) / 6 - 1;
+//         //extract corners points and surface points
+//         for ( int i = 0; i < m_laser_scan_number; i++ )
+//         {
+//             pcl::PointCloud<PointType>::Ptr surfPointsLessFlatScan( new pcl::PointCloud<PointType> );
+//             // To ensure the distribution of features point, spilt each scan into 6 parts equally according to their curvature.
+//             for ( int j = 0; j < 6; j++ )
+//             {
+//                 //Starting of each sub-scan.
+//                 int sp = ( scanStartInd[ i ] * ( 6 - j ) + scanEndInd[ i ] * j ) / 6;
+//                 //Ending of each sub-scan.
+//                 int ep = ( scanStartInd[ i ] * ( 5 - j ) + scanEndInd[ i ] * ( j + 1 ) ) / 6 - 1;
 
-                //sort curvature
-                for ( int k = sp + 1; k <= ep; k++ )
-                {
-                    for ( int l = k; l >= sp + 1; l-- )
-                    {
-                        if ( m_pc_curvature[ m_pc_sort_idx[ l ] ] < m_pc_curvature[ m_pc_sort_idx[ l - 1 ] ] )
-                        {
-                            int temp = m_pc_sort_idx[ l - 1 ];
-                            m_pc_sort_idx[ l - 1 ] = m_pc_sort_idx[ l ];
-                            m_pc_sort_idx[ l ] = temp;
-                        }
-                    }
-                }
+//                 //sort curvature
+//                 for ( int k = sp + 1; k <= ep; k++ )
+//                 {
+//                     for ( int l = k; l >= sp + 1; l-- )
+//                     {
+//                         if ( m_pc_curvature[ m_pc_sort_idx[ l ] ] < m_pc_curvature[ m_pc_sort_idx[ l - 1 ] ] )
+//                         {
+//                             int temp = m_pc_sort_idx[ l - 1 ];
+//                             m_pc_sort_idx[ l - 1 ] = m_pc_sort_idx[ l ];
+//                             m_pc_sort_idx[ l ] = temp;
+//                         }
+//                     }
+//                 }
 
-                //select the most shart and flat point
-                int largestPickedNum = 0;
-                for ( int k = ep; k >= sp; k-- )
-                {
-                    int ind = m_pc_sort_idx[ k ]; //The index of biggest curvature.
+//                 //select the most shart and flat point
+//                 int largestPickedNum = 0;
+//                 for ( int k = ep; k >= sp; k-- )
+//                 {
+//                     int ind = m_pc_sort_idx[ k ]; //The index of biggest curvature.
 
-                    if ( m_pc_neighbor_picked[ ind ] == 0 &&
-                         m_pc_curvature[ ind ] > sharp_point_threshold * 10 )
-                    {
+//                     if ( m_pc_neighbor_picked[ ind ] == 0 &&
+//                          m_pc_curvature[ ind ] > sharp_point_threshold * 10 )
+//                     {
 
-                        largestPickedNum++;
-                        if ( largestPickedNum <= 20 )
-                        {
-                            m_pc_cloud_label[ ind ] = 2; //2 -> the label sharpest points.
-                            cornerPointsSharp.push_back( laserCloud->points[ ind ] );
-                            cornerPointsLessSharp.push_back( laserCloud->points[ ind ] );
-                        }
-                        else if ( largestPickedNum <= 200 )
-                        {
-                            m_pc_cloud_label[ ind ] = 1; //1 -> the label of less sharpest points.
-                            cornerPointsLessSharp.push_back( laserCloud->points[ ind ] );
-                        }
-                        else
-                        {
-                            break;
-                        }
+//                         largestPickedNum++;
+//                         if ( largestPickedNum <= 20 )
+//                         {
+//                             m_pc_cloud_label[ ind ] = 2; //2 -> the label sharpest points.
+//                             cornerPointsSharp.push_back( laserCloud->points[ ind ] );
+//                             cornerPointsLessSharp.push_back( laserCloud->points[ ind ] );
+//                         }
+//                         else if ( largestPickedNum <= 200 )
+//                         {
+//                             m_pc_cloud_label[ ind ] = 1; //1 -> the label of less sharpest points.
+//                             cornerPointsLessSharp.push_back( laserCloud->points[ ind ] );
+//                         }
+//                         else
+//                         {
+//                             break;
+//                         }
 
-                        m_pc_neighbor_picked[ ind ] = 1;
+//                         m_pc_neighbor_picked[ ind ] = 1;
 
-                        float times = 100;
-                        // delete 5 neighbor of sharpest points.
-                        for ( int l = 1; l <= 5 * times; l++ )
-                        {
-                            float diffX = laserCloud->points[ ind + l ].x - laserCloud->points[ ind + l - 1 ].x;
-                            float diffY = laserCloud->points[ ind + l ].y - laserCloud->points[ ind + l - 1 ].y;
-                            float diffZ = laserCloud->points[ ind + l ].z - laserCloud->points[ ind + l - 1 ].z;
-                            if ( diffX * diffX + diffY * diffY + diffZ * diffZ > 0.05 )
-                            {
-                                break;
-                            }
+//                         float times = 100;
+//                         // delete 5 neighbor of sharpest points.
+//                         for ( int l = 1; l <= 5 * times; l++ )
+//                         {
+//                             float diffX = laserCloud->points[ ind + l ].x - laserCloud->points[ ind + l - 1 ].x;
+//                             float diffY = laserCloud->points[ ind + l ].y - laserCloud->points[ ind + l - 1 ].y;
+//                             float diffZ = laserCloud->points[ ind + l ].z - laserCloud->points[ ind + l - 1 ].z;
+//                             if ( diffX * diffX + diffY * diffY + diffZ * diffZ > 0.05 )
+//                             {
+//                                 break;
+//                             }
 
-                            m_pc_neighbor_picked[ ind + l ] = 1;
-                        }
-                        for ( int l = -1; l >= -5 * times; l-- )
-                        {
-                            float diffX = laserCloud->points[ ind + l ].x - laserCloud->points[ ind + l + 1 ].x;
-                            float diffY = laserCloud->points[ ind + l ].y - laserCloud->points[ ind + l + 1 ].y;
-                            float diffZ = laserCloud->points[ ind + l ].z - laserCloud->points[ ind + l + 1 ].z;
-                            if ( diffX * diffX + diffY * diffY + diffZ * diffZ > 0.05 )
-                            {
-                                break;
-                            }
+//                             m_pc_neighbor_picked[ ind + l ] = 1;
+//                         }
+//                         for ( int l = -1; l >= -5 * times; l-- )
+//                         {
+//                             float diffX = laserCloud->points[ ind + l ].x - laserCloud->points[ ind + l + 1 ].x;
+//                             float diffY = laserCloud->points[ ind + l ].y - laserCloud->points[ ind + l + 1 ].y;
+//                             float diffZ = laserCloud->points[ ind + l ].z - laserCloud->points[ ind + l + 1 ].z;
+//                             if ( diffX * diffX + diffY * diffY + diffZ * diffZ > 0.05 )
+//                             {
+//                                 break;
+//                             }
 
-                            m_pc_neighbor_picked[ ind + l ] = 1;
-                        }
-                    }
-                }
+//                             m_pc_neighbor_picked[ ind + l ] = 1;
+//                         }
+//                     }
+//                 }
 
-                int smallestPickedNum = 0;
-                for ( int k = sp; k <= ep; k++ )
-                {
-                    int ind = m_pc_sort_idx[ k ];
+//                 int smallestPickedNum = 0;
+//                 for ( int k = sp; k <= ep; k++ )
+//                 {
+//                     int ind = m_pc_sort_idx[ k ];
 
-                    if ( m_pc_neighbor_picked[ ind ] == 0 &&
-                         m_pc_curvature[ ind ] < sharp_point_threshold )
-                    {
+//                     if ( m_pc_neighbor_picked[ ind ] == 0 &&
+//                          m_pc_curvature[ ind ] < sharp_point_threshold )
+//                     {
 
-                        m_pc_cloud_label[ ind ] = -1; // -1 the lable of flat points
-                        surfPointsFlat.push_back( laserCloud->points[ ind ] );
+//                         m_pc_cloud_label[ ind ] = -1; // -1 the lable of flat points
+//                         surfPointsFlat.push_back( laserCloud->points[ ind ] );
 
-                        smallestPickedNum++;
-                        if ( smallestPickedNum >= 5 )
-                        { // 0 the label of less flat points.
-                            break;
-                        }
+//                         smallestPickedNum++;
+//                         if ( smallestPickedNum >= 5 )
+//                         { // 0 the label of less flat points.
+//                             break;
+//                         }
 
-                        m_pc_neighbor_picked[ ind ] = 1;
-                        for ( int l = 1; l <= 5; l++ )
-                        {
-                            float diffX = laserCloud->points[ ind + l ].x - laserCloud->points[ ind + l - 1 ].x;
-                            float diffY = laserCloud->points[ ind + l ].y - laserCloud->points[ ind + l - 1 ].y;
-                            float diffZ = laserCloud->points[ ind + l ].z - laserCloud->points[ ind + l - 1 ].z;
-                            if ( diffX * diffX + diffY * diffY + diffZ * diffZ > 0.05 )
-                            {
-                                break;
-                            }
+//                         m_pc_neighbor_picked[ ind ] = 1;
+//                         for ( int l = 1; l <= 5; l++ )
+//                         {
+//                             float diffX = laserCloud->points[ ind + l ].x - laserCloud->points[ ind + l - 1 ].x;
+//                             float diffY = laserCloud->points[ ind + l ].y - laserCloud->points[ ind + l - 1 ].y;
+//                             float diffZ = laserCloud->points[ ind + l ].z - laserCloud->points[ ind + l - 1 ].z;
+//                             if ( diffX * diffX + diffY * diffY + diffZ * diffZ > 0.05 )
+//                             {
+//                                 break;
+//                             }
 
-                            m_pc_neighbor_picked[ ind + l ] = 1;
-                        }
-                        for ( int l = -1; l >= -5; l-- )
-                        {
-                            float diffX = laserCloud->points[ ind + l ].x - laserCloud->points[ ind + l + 1 ].x;
-                            float diffY = laserCloud->points[ ind + l ].y - laserCloud->points[ ind + l + 1 ].y;
-                            float diffZ = laserCloud->points[ ind + l ].z - laserCloud->points[ ind + l + 1 ].z;
-                            if ( diffX * diffX + diffY * diffY + diffZ * diffZ > 0.05 )
-                            {
-                                break;
-                            }
+//                             m_pc_neighbor_picked[ ind + l ] = 1;
+//                         }
+//                         for ( int l = -1; l >= -5; l-- )
+//                         {
+//                             float diffX = laserCloud->points[ ind + l ].x - laserCloud->points[ ind + l + 1 ].x;
+//                             float diffY = laserCloud->points[ ind + l ].y - laserCloud->points[ ind + l + 1 ].y;
+//                             float diffZ = laserCloud->points[ ind + l ].z - laserCloud->points[ ind + l + 1 ].z;
+//                             if ( diffX * diffX + diffY * diffY + diffZ * diffZ > 0.05 )
+//                             {
+//                                 break;
+//                             }
 
-                            m_pc_neighbor_picked[ ind + l ] = 1;
-                        }
-                    }
-                }
+//                             m_pc_neighbor_picked[ ind + l ] = 1;
+//                         }
+//                     }
+//                 }
 
-                // The ublabeled point is the less flat points
-                for ( int k = sp; k <= ep; k++ )
-                {
-                    if ( m_pc_cloud_label[ k ] <= 0 )
-                    {
-                        surfPointsLessFlatScan->push_back( laserCloud->points[ k ] );
-                    }
-                }
-            }
+//                 // The ublabeled point is the less flat points
+//                 for ( int k = sp; k <= ep; k++ )
+//                 {
+//                     if ( m_pc_cloud_label[ k ] <= 0 )
+//                     {
+//                         surfPointsLessFlatScan->push_back( laserCloud->points[ k ] );
+//                     }
+//                 }
+//             }
 
-            // voxel filter for less sharp points.
-            pcl::PointCloud<PointType> surfPointsLessFlatScanDS;
+//             // voxel filter for less sharp points.
+//             pcl::PointCloud<PointType> surfPointsLessFlatScanDS;
 
-            m_voxel_filter_for_surface.setInputCloud( surfPointsLessFlatScan );
-            m_voxel_filter_for_surface.filter( surfPointsLessFlatScanDS );
+//             m_voxel_filter_for_surface.setInputCloud( surfPointsLessFlatScan );
+//             m_voxel_filter_for_surface.filter( surfPointsLessFlatScanDS );
 
-            surfPointsLessFlat += surfPointsLessFlatScanDS;
-        }
+//             surfPointsLessFlat += surfPointsLessFlatScanDS;
+//         }
 
-        //printf_line;
-        //printf_line;
-        //printf( "sort q time %f \n", t_q_sort );
-        //printf_line;
-        sensor_msgs::PointCloud2 laserCloudOutMsg;
-        pcl::toROSMsg( *laserCloud, laserCloudOutMsg );
-        laserCloudOutMsg.header.stamp = laserCloudMsg->header.stamp;
-        laserCloudOutMsg.header.frame_id = "/camera_init";
-        m_pub_laser_pc.publish( laserCloudOutMsg );
+//         //printf_line;
+//         //printf_line;
+//         //printf( "sort q time %f \n", t_q_sort );
+//         //printf_line;
+//         sensor_msgs::PointCloud2 laserCloudOutMsg;
+//         pcl::toROSMsg( *laserCloud, laserCloudOutMsg );
+//         laserCloudOutMsg.header.stamp = laserCloudMsg->header.stamp;
+//         laserCloudOutMsg.header.frame_id = "/camera_init";
+//         m_pub_laser_pc.publish( laserCloudOutMsg );
 
-        sensor_msgs::PointCloud2 cornerPointsSharpMsg;
-        pcl::toROSMsg( cornerPointsSharp, cornerPointsSharpMsg );
-        cornerPointsSharpMsg.header.stamp = laserCloudMsg->header.stamp;
-        cornerPointsSharpMsg.header.frame_id = "/camera_init";
-        m_pub_pc_sharp_corner.publish( cornerPointsSharpMsg );
+//         sensor_msgs::PointCloud2 cornerPointsSharpMsg;
+//         pcl::toROSMsg( cornerPointsSharp, cornerPointsSharpMsg );
+//         cornerPointsSharpMsg.header.stamp = laserCloudMsg->header.stamp;
+//         cornerPointsSharpMsg.header.frame_id = "/camera_init";
+//         m_pub_pc_sharp_corner.publish( cornerPointsSharpMsg );
 
-        sensor_msgs::PointCloud2 cornerPointsLessSharpMsg;
-        pcl::toROSMsg( cornerPointsLessSharp, cornerPointsLessSharpMsg );
-        cornerPointsLessSharpMsg.header.stamp = laserCloudMsg->header.stamp;
-        cornerPointsLessSharpMsg.header.frame_id = "/camera_init";
-        m_pub_pc_less_sharp_corner.publish( cornerPointsLessSharpMsg );
+//         sensor_msgs::PointCloud2 cornerPointsLessSharpMsg;
+//         pcl::toROSMsg( cornerPointsLessSharp, cornerPointsLessSharpMsg );
+//         cornerPointsLessSharpMsg.header.stamp = laserCloudMsg->header.stamp;
+//         cornerPointsLessSharpMsg.header.frame_id = "/camera_init";
+//         m_pub_pc_less_sharp_corner.publish( cornerPointsLessSharpMsg );
 
-        sensor_msgs::PointCloud2 surfPointsFlat2;
-        pcl::toROSMsg( surfPointsFlat, surfPointsFlat2 );
-        surfPointsFlat2.header.stamp = laserCloudMsg->header.stamp;
-        surfPointsFlat2.header.frame_id = "/camera_init";
-        m_pub_pc_surface_flat.publish( surfPointsFlat2 );
+//         sensor_msgs::PointCloud2 surfPointsFlat2;
+//         pcl::toROSMsg( surfPointsFlat, surfPointsFlat2 );
+//         surfPointsFlat2.header.stamp = laserCloudMsg->header.stamp;
+//         surfPointsFlat2.header.frame_id = "/camera_init";
+//         m_pub_pc_surface_flat.publish( surfPointsFlat2 );
 
-        sensor_msgs::PointCloud2 surfPointsLessFlat2;
-        pcl::toROSMsg( surfPointsLessFlat, surfPointsLessFlat2 );
-        surfPointsLessFlat2.header.stamp = laserCloudMsg->header.stamp;
-        surfPointsLessFlat2.header.frame_id = "/camera_init";
-        m_pub_pc_surface_less_flat.publish( surfPointsLessFlat2 );
+//         sensor_msgs::PointCloud2 surfPointsLessFlat2;
+//         pcl::toROSMsg( surfPointsLessFlat, surfPointsLessFlat2 );
+//         surfPointsLessFlat2.header.stamp = laserCloudMsg->header.stamp;
+//         surfPointsLessFlat2.header.frame_id = "/camera_init";
+//         m_pub_pc_surface_less_flat.publish( surfPointsLessFlat2 );
 
-        // pub each scam
-        if ( m_if_pub_each_line )
-        {
-            for ( int i = 0; i < m_laser_scan_number; i++ )
-            {
-                sensor_msgs::PointCloud2 scanMsg;
-                pcl::toROSMsg( laserCloudScans[ i ], scanMsg );
-                scanMsg.header.stamp = laserCloudMsg->header.stamp;
-                scanMsg.header.frame_id = "/camera_init";
-                m_pub_each_scan[ i ].publish( scanMsg );
-            }
-        }
+//         // pub each scam
+//         if ( m_if_pub_each_line )
+//         {
+//             for ( int i = 0; i < m_laser_scan_number; i++ )
+//             {
+//                 sensor_msgs::PointCloud2 scanMsg;
+//                 pcl::toROSMsg( laserCloudScans[ i ], scanMsg );
+//                 scanMsg.header.stamp = laserCloudMsg->header.stamp;
+//                 scanMsg.header.frame_id = "/camera_init";
+//                 m_pub_each_scan[ i ].publish( scanMsg );
+//             }
+//         }
+////////////////************************************* 以上注释毫无影响 ******************************* //////////////////
     }
 
     void init_livox_lidar_para()

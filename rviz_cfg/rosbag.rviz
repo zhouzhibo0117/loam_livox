@@ -51,7 +51,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: ""
+    SyncSource: PointCloud2
 Toolbars:
   toolButtonStyle: 2
 Visualization Manager:
@@ -277,8 +277,8 @@ Visualization Manager:
         - Alpha: 0.100000001
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
-            Max Value: 2.34725976
-            Min Value: -0.689926445
+            Max Value: 8.35603905
+            Min Value: -0.874826252
             Value: true
           Axis: Z
           Channel Name: intensity
@@ -688,25 +688,25 @@ Visualization Manager:
   Value: true
   Views:
     Current:
-      Class: rviz/Orbit
-      Distance: 34.1051559
+      Class: rviz/ThirdPersonFollower
+      Distance: 56.9650688
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.0599999987
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -7.64976597
-        Y: -4.75493765
-        Z: 15.8039179
+        X: 12.3082352
+        Y: -6.82637072
+        Z: 0
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.0500000007
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.00999999978
-      Pitch: 0.204797059
+      Pitch: 0.204797223
       Target Frame: body
-      Value: Orbit (rviz)
+      Value: ThirdPersonFollower (rviz)
       Yaw: 3.0381732
     Saved: ~
 Window Geometry:

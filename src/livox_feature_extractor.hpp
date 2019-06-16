@@ -601,11 +601,14 @@ class Livox_laser
                         continue;
                     }*/
 
+                // TODO: 为什么需要这样分情况讨论？
+                // polar_dis_sq2 越大，说明圆锥中心的夹角越大。
+                // 测试证明，基本上不会进入 if 之中，而都会进入 else 条件中。
                 if ( m_pts_info_vec[ split_idx[ val_index + 1 ] ].polar_dis_sq2 > 10000 )
                 {
                     pt_angle_index = split_idx[ val_index + 1 ] - ( int ) ( internal_size * 0.20 );
                     scan_angle = atan2( m_pts_info_vec[ pt_angle_index ].pt_2d_img( 1 ), m_pts_info_vec[ pt_angle_index ].pt_2d_img( 0 ) ) * 57.3;
-                    scan_angle = scan_angle + 180.0;
+                    scan_angle = scan_angle + 180.0; // 角度全部转化到 0-360 度之中。
                     //pt_angle_index = split_idx[ val_index + 1 ] - 10;
                 }
                 else
@@ -745,15 +748,9 @@ class Livox_laser
                     set_intensity( laserCloudScans[ i ].points[ scan_avail_num ], default_return_intensity_type );
                     scan_avail_num++;
                     // cur_pt_idx++;
-
-                    std::cout<<laserCloudScans[ i ].points[ scan_avail_num ].x<<'\t'
-                    <<laserCloudScans[ i ].points[ scan_avail_num ].y<<'\t'
-                    <<laserCloudScans[ i ].points[ scan_avail_num ].z<<'\n';
                 }
             }
             laserCloudScans[ i ].resize( scan_avail_num );
-
-            std::cout<<std::endl;
         }
         //printf_line;
     }

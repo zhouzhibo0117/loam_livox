@@ -977,7 +977,7 @@ class Laser_mapping
 
                                     // if is indeed line feature
                                     // note Eigen library sort eigenvalues in increasing order
-                                    //Eigen::Vector3d unit_direction = saes.eigenvectors().col( 2 );
+                                    // Eigen::Vector3d unit_direction = saes.eigenvectors().col( 2 );
 
                                     if ( saes.eigenvalues()[ 2 ] > 3 * saes.eigenvalues()[ 1 ] )
                                     {
@@ -1462,3 +1462,5 @@ class Laser_mapping
 };
 
 #endif // LASER_MAPPING_HPP
+
+// TODO: 检查实时性：有没有topic掉帧。
