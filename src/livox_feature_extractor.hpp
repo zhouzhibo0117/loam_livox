@@ -694,6 +694,8 @@ class Livox_laser
         int       scan_idx = 0;
 
         // 根据 scan_id_index 的不同，将原始点云 laserCloudIn 划分到不同的 scan。
+        // scan_id_index vector代表 0-360 度之间的一些不同角度，每一帧大约有15个角度。
+        // eg. [176.53	195.09	34.49	53.17	290.8	110.8	132.2	336.2	353.3  195.3	 216.8	77.92	131.57	150.80	352.8]
         for ( unsigned int i = 0; i < laserCloudIn.size(); i++ )
         {
 
@@ -743,9 +745,15 @@ class Livox_laser
                     set_intensity( laserCloudScans[ i ].points[ scan_avail_num ], default_return_intensity_type );
                     scan_avail_num++;
                     // cur_pt_idx++;
+
+                    std::cout<<laserCloudScans[ i ].points[ scan_avail_num ].x<<'\t'
+                    <<laserCloudScans[ i ].points[ scan_avail_num ].y<<'\t'
+                    <<laserCloudScans[ i ].points[ scan_avail_num ].z<<'\n';
                 }
             }
             laserCloudScans[ i ].resize( scan_avail_num );
+
+            std::cout<<std::endl;
         }
         //printf_line;
     }
