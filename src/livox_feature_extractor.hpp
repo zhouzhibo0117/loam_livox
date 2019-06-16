@@ -153,7 +153,7 @@ class Livox_laser
     float thr_corner_curvature = 0.05;
     float thr_surface_curvature = 0.01;
     float minimum_view_angle = 10;
-    std::vector< Pt_infos >  m_pts_info_vec;
+    std::vector< Pt_infos >  m_pts_info_vec; // TODO: ???
     std::vector< PointType > m_raw_pts_vec;
 #if USE_HASH
     std::unordered_map< PointType, Pt_infos *, Pt_hasher, Pt_compare >           m_map_pt_idx; // using hash_map
@@ -363,6 +363,7 @@ class Livox_laser
         }
     }
 
+    // 计算改变 m_pts_info_vec 的各种属性。
     // compute curvature and view angle
     void compute_features()
     {
@@ -493,6 +494,7 @@ class Livox_laser
             m_last_maximum_time_stamp = pt_info->time_stamp;
             m_input_points_size++;
 
+            // 将 pt_type 设为无效点 e_pt_nan。
             if ( !std::isfinite( laserCloudIn.points[ idx ].x ) ||
                  !std::isfinite( laserCloudIn.points[ idx ].y ) ||
                  !std::isfinite( laserCloudIn.points[ idx ].z ) )
@@ -501,6 +503,7 @@ class Livox_laser
                 continue;
             }
 
+            // 将 pt_type 设为零点 e_pt_000。
             if ( laserCloudIn.points[ idx ].x == 0 )
             {
                 if ( idx == 0 )
@@ -534,6 +537,7 @@ class Livox_laser
                 add_mask_of_point( pt_info, e_pt_circle_edge, 2 );
             }
 
+            // 分离玫瑰花瓣线，得到 vector：split_idx，来保存那些花瓣尖处的点。
             // Split scans
             if ( idx >= 1 )
             {
@@ -564,7 +568,6 @@ class Livox_laser
                     if ( zero_idx.size() == 0 || ( idx - split_idx[ split_idx.size() - 1 ] ) > 50 )
                     {
                         split_idx.push_back( idx );
-
                         zero_idx.push_back( idx );
                         continue;
                     }
@@ -684,12 +687,13 @@ class Livox_laser
                            const std::vector< float > &                 scan_id_index,
                            std::vector< pcl::PointCloud< PointType > > &laserCloudScans )
     {
-        std::vector< std::vector< int > > pts_mask;
+        std::vector< std::vector< int > > pts_mask; // 存储点的类型 m_pts_info_vec[].pt_type。
         laserCloudScans.resize( clutter_size );
         pts_mask.resize( clutter_size );
         PointType point;
         int       scan_idx = 0;
 
+        // 根据 scan_id_index 的不同，将原始点云 laserCloudIn 划分到不同的 scan。
         for ( unsigned int i = 0; i < laserCloudIn.size(); i++ )
         {
 
@@ -716,6 +720,7 @@ class Livox_laser
                                  //e_circle_edge
                                    ;
 
+        // 移除掉一些零点、过近点、无效点。
         for ( unsigned int i = 0; i < laserCloudScans.size(); i++ )
         {
             //std::cout << "Scan idx = " << i;
@@ -724,6 +729,7 @@ class Livox_laser
             int scan_avail_num = 0;
             for ( unsigned int idx = 0; idx < laserCloudScans[ i ].size(); idx++ )
             {
+                // TODO: 为什么要采取“&、|”这样的形式
                 if ( ( pts_mask[ i ][ idx ] & remove_point_pt_type ) == 0 )
                 //if(pts_mask[i][idx] == e_normal )
                 {
