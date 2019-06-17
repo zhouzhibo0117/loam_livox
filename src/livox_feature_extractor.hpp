@@ -142,7 +142,7 @@ class Livox_laser
 
     float max_fov = 17; // Edge of circle to main axis
     float m_max_edge_polar_pos = 0;
-    float m_time_internal_pts = 1.0e-5; // 10us = 1e-5
+    float m_time_interval_pts = 1.0e-5; // 10us = 1e-5
     float m_cx = 0;
     float m_cy = 0;
     int   m_if_save_pcd_file = 0;
@@ -244,7 +244,7 @@ class Livox_laser
                         pc_corners.points[ corner_num ] = m_raw_pts_vec[ i ];
                         //set_intensity( pc_corners.points[ corner_num ], e_I_motion_blur );
                         //pc_corners.points[ corner_num ].intensity = float(m_pts_info_vec[ i ].idx + 1) /m_pts_info_vec.size();
-                        pc_corners.points[ corner_num ].intensity = m_pts_info_vec[ i ].time_stamp;
+                        pc_corners.points[ corner_num ].intensity = m_pts_info_vec[ i ].time_stamp; // intensity 中存储时间戳信息。
                         corner_num++;
                     }
                 }
@@ -490,7 +490,7 @@ class Livox_laser
             m_map_pt_idx.insert( std::make_pair( laserCloudIn.points[ idx ], pt_info ) );
             pt_info->raw_intensity = laserCloudIn.points[ idx ].intensity;
             pt_info->idx = idx;
-            pt_info->time_stamp = m_current_time + ( ( float ) idx ) * m_time_internal_pts;
+            pt_info->time_stamp = m_current_time + ( ( float ) idx ) * m_time_interval_pts;
             m_last_maximum_time_stamp = pt_info->time_stamp;
             m_input_points_size++;
 

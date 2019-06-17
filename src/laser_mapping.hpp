@@ -98,9 +98,9 @@ struct Data_pair
     sensor_msgs::PointCloud2ConstPtr m_pc_corner;
     sensor_msgs::PointCloud2ConstPtr m_pc_full;
     sensor_msgs::PointCloud2ConstPtr m_pc_plane;
-    bool                             m_has_pc_corner = 0;
-    bool                             m_has_pc_full = 0;
-    bool                             m_has_pc_plane = 0;
+    bool                             m_has_pc_corner = false;
+    bool                             m_has_pc_full = false;
+    bool                             m_has_pc_plane = false;
 
     void add_pc_corner( sensor_msgs::PointCloud2ConstPtr ros_pc )
     {
@@ -122,7 +122,7 @@ struct Data_pair
 
     bool is_completed()
     {
-        return ( m_has_pc_corner & m_has_pc_full & m_has_pc_plane );
+        return m_has_pc_corner && m_has_pc_full && m_has_pc_plane;
     }
 };
 
@@ -177,14 +177,14 @@ class Laser_mapping
     pcl::PointCloud<PointType>::Ptr m_laser_cloud_corner_from_map;
     pcl::PointCloud<PointType>::Ptr m_laser_cloud_surf_from_map;
 
-    //input & output: points in one frame. local --> global
+    // input & output: points in one frame. local --> global
     pcl::PointCloud<PointType>::Ptr m_laser_cloud_full_res;
 
     // input: from odom
     pcl::PointCloud<PointType>::Ptr m_laser_cloud_corner_last;
     pcl::PointCloud<PointType>::Ptr m_laser_cloud_surf_last;
 
-    //kd-tree
+    // kd-tree
     pcl::KdTreeFLANN<PointType>::Ptr m_kdtree_corner_from_map;
     pcl::KdTreeFLANN<PointType>::Ptr m_kdtree_surf_from_map;
 
@@ -554,6 +554,7 @@ class Laser_mapping
         max_I = -min_I;
         for ( int i = 0; i < pt_size; i++ )
         {
+            // intensity 中实际上存储的是每一点的时间信息。
             min_I = std::min( pc_ptr->points[ i ].intensity, min_I );
             max_I = std::max( pc_ptr->points[ i ].intensity, max_I );
         }
@@ -591,12 +592,15 @@ class Laser_mapping
         //pcl::VoxelGrid<PointType> downSizeFilterSurf;
         double first_time_stamp = -1;
         m_last_max_blur = 0.0;
-        while ( 1 )
+        unsigned long iter_count = 0;
+        while ( iter_count >= 0)
         {
+            iter_count++;
             {
 
                 m_file_logger.printf( "------------------\r\n" );
 
+                // 获取最新数据帧。
                 while ( m_queue_avail_data.empty() )
                 {
                     sleep( 0.0001 );
@@ -623,15 +627,14 @@ class Laser_mapping
 
                 m_laser_cloud_corner_last->clear();
                 pcl::fromROSMsg( *( current_data_pair->m_pc_corner ), *m_laser_cloud_corner_last );
-
                 m_laser_cloud_surf_last->clear();
                 pcl::fromROSMsg( *( current_data_pair->m_pc_plane ), *m_laser_cloud_surf_last );
-
                 m_laser_cloud_full_res->clear();
                 pcl::fromROSMsg( *( current_data_pair->m_pc_full ), *m_laser_cloud_full_res );
 
                 delete current_data_pair;
                 float min_t, max_t;
+                // 得到 cloud_full_res 中点的最早和最晚时间。
                 find_min_max_intensity( m_laser_cloud_full_res, min_t, max_t );
 
                 m_q_w_last = m_q_w_curr;
@@ -1154,7 +1157,7 @@ class Laser_mapping
                             // Remove outliers
                             residual_block_ids_bak.clear();
                             //if ( summary.final_cost > m_max_final_cost * 0.001 )
-                            if(1)
+                            if(true)
                             {
                                 ceres::Problem::EvaluateOptions eval_options;
                                 eval_options.residual_blocks = residual_block_ids;
@@ -1401,7 +1404,7 @@ class Laser_mapping
                 odomAftMapped.header.frame_id = "/camera_init";
                 odomAftMapped.child_frame_id = "/aft_mapped";
                 odomAftMapped.header.stamp = ros::Time().fromSec( m_time_odom );
-                if ( 1 )
+                if ( true )
                 {
                     odomAftMapped.pose.pose.orientation.x = m_q_w_curr.x();
                     odomAftMapped.pose.pose.orientation.y = m_q_w_curr.y();
