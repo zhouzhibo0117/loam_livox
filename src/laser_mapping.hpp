@@ -185,13 +185,14 @@ public:
     int m_laser_cloud_valid_Idx[1024];
     int m_laser_cloud_surround_Idx[1024];
 
-    double m_para_buffer_RT[7] = {0, 0, 0, 1, 0, 0, 0};
+    double m_para_buffer_RT[7] = {0, 0, 0, 1, 0, 0, 0}; // (qx,qy,qz,qw,tx,ty,tz)。
     double m_para_buffer_RT_last[7] = {0, 0, 0, 1, 0, 0, 0};
     double m_para_buffer_incremental[7] = {0, 0, 0, 1, 0, 0, 0};
 
     // wmap_T_odom * odom_T_curr = wmap_T_curr;
     // transformation between odom's world and map's world frame
 
+    // 注意：eigen库中四元数的声明顺序为(w,x,y,z)，但是内部存储顺序为(x,y,z,w)
     const Eigen::Quaterniond m_q_I = Eigen::Quaterniond(1, 0, 0, 0);
 
 
@@ -289,8 +290,10 @@ public:
 
     ~Laser_mapping() {};
 
-    void compute_interpolatation_rodrigue(const Eigen::Quaterniond &q_in, Eigen::Matrix<double, 3, 1> &angle_axis,
-                                          double &angle_theta, Eigen::Matrix<double, 3, 3> &hat) {
+    void compute_interpolatation_rodrigue(const Eigen::Quaterniond &q_in,
+                                          Eigen::Matrix<double, 3, 1> &angle_axis,
+                                          double &angle_theta,
+                                          Eigen::Matrix<double, 3, 3> &hat) {
         Eigen::AngleAxisd newAngleAxis(q_in);
         angle_axis = newAngleAxis.axis();
         angle_axis = angle_axis / angle_axis.norm();
@@ -390,6 +393,8 @@ public:
         //if ( MOTION_DEBLUR == 0 || interpolate_s == 1.0 )
         //if(1)
         //if ( if_undistore == 0 || interpolate_s == 1.0 )
+
+        // 一般情况下，MOTION_DEBLUR=0，if_undistore=1，interpolate_s<1；则一般只会执行 if 语段。
         if (MOTION_DEBLUR == 0 || if_undistore == 0 || interpolate_s == 1.0) {
             point_w = m_q_w_curr * point_curr + m_t_w_curr;
         } else {
@@ -399,15 +404,16 @@ public:
                 //assert( interpolate_s <= 1.0 && interpolate_s >= 0.0 );
             }
 
-            if (1) {
-                //https://en.wikipedia.org/wiki/Rodrigues%27_rotation_formula
+            if (true) {
+                // https://en.wikipedia.org/wiki/Rodrigues%27_rotation_formula
+                // 线性插值
                 Eigen::Vector3d interpolate_T = m_t_w_incre * (interpolate_s * BLUR_SCALE);
                 double interpolate_R_theta = m_interpolatation_theta * interpolate_s;
                 Eigen::Matrix<double, 3, 3> interpolate_R_mat;
 
-                interpolate_R_mat =
-                        Eigen::Matrix3d::Identity() + sin(interpolate_R_theta) * m_interpolatation_omega_hat +
-                        (1 - cos(interpolate_R_theta)) * m_interpolatation_omega_hat_sq2;
+                interpolate_R_mat = Eigen::Matrix3d::Identity() +
+                                    sin(interpolate_R_theta) * m_interpolatation_omega_hat +
+                                    (1 - cos(interpolate_R_theta)) * m_interpolatation_omega_hat_sq2;
                 point_w = m_q_w_last * (interpolate_R_mat * point_curr + interpolate_T) + m_t_w_last;
             } else {
                 //interpolate_s *= 2.0;
@@ -428,7 +434,8 @@ public:
         //po->intensity = 1.0;
     }
 
-    void pointAssociateTobeMapped(PointType const *const pi, PointType *const po) {
+    void pointAssociateTobeMapped(PointType const *const pi,
+                                  PointType *const po) {
         Eigen::Vector3d point_w(pi->x, pi->y, pi->z);
         Eigen::Vector3d point_curr = m_q_w_curr.inverse() * (point_w - m_t_w_curr);
         po->x = point_curr.x();
@@ -437,22 +444,26 @@ public:
         po->intensity = pi->intensity;
     }
 
-    unsigned int pointcloudAssociateToMap(pcl::PointCloud<PointType> const &pc_in, pcl::PointCloud<PointType> &pt_out,
+    unsigned int pointcloudAssociateToMap(pcl::PointCloud<PointType> const &pc_in,
+                                          pcl::PointCloud<PointType> &pt_out,
                                           int if_undistore = 0) {
         unsigned int points_size = pc_in.points.size();
         pt_out.points.resize(points_size);
 
         for (unsigned int i = 0; i < points_size; i++) {
-            pointAssociateToMap(&pc_in.points[i], &pt_out.points[i],
-                                refine_blur(pc_in.points[i].intensity, m_minimum_pt_time_stamp,
-                                            m_maximum_pt_time_stamp), if_undistore);
+            pointAssociateToMap(&pc_in.points[i],
+                                &pt_out.points[i],
+                                refine_blur(pc_in.points[i].intensity,
+                                            m_minimum_pt_time_stamp,
+                                            m_maximum_pt_time_stamp),
+                                if_undistore);
         }
 
         return points_size;
     }
 
-    unsigned int
-    pointcloudAssociateTbeoMapped(pcl::PointCloud<PointType> const &pc_in, pcl::PointCloud<PointType> &pt_out) {
+    unsigned int pointcloudAssociateTbeoMapped(pcl::PointCloud<PointType> const &pc_in,
+                                               pcl::PointCloud<PointType> &pt_out) {
         unsigned int points_size = pc_in.points.size();
         pt_out.points.resize(points_size);
 
@@ -528,7 +539,9 @@ public:
         m_pub_odom_aft_mapped_hight_frec.publish(odomAftMapped);
     }
 
-    void find_min_max_intensity(const pcl::PointCloud<PointType>::Ptr pc_ptr, float &min_I, float &max_I) {
+    void find_min_max_intensity(const pcl::PointCloud<PointType>::Ptr pc_ptr,
+                                float &min_I,
+                                float &max_I) {
         int pt_size = pc_ptr->size();
         min_I = 10000;
         max_I = -min_I;
@@ -539,7 +552,9 @@ public:
         }
     }
 
-    float refine_blur(float in_blur, const float &min_blur, const float &max_blur) {
+    float refine_blur(float in_blur,
+                      const float &min_blur,
+                      const float &max_blur) {
         return (in_blur - min_blur) / (max_blur - min_blur);
     }
 
@@ -1007,6 +1022,7 @@ public:
                                     //ceres::CostFunction *cost_function = LidarEdgeFactor::Create( curr_point, point_a, point_b, 1.0 );
                                     //ceres::CostFunction *cost_function = ceres_icp_point2line< double >::Create( curr_point, point_a, point_b );
                                     ceres::CostFunction *cost_function;
+                                    // launch文件:MOTION_DEBLUR=0;
                                     if (MOTION_DEBLUR) {
                                         cost_function = ceres_icp_point2line<double>::Create(
                                                 curr_point,
@@ -1105,6 +1121,7 @@ public:
                                 if (ICP_PLANE) {
                                     ceres::CostFunction *cost_function;
                                     //if ( MOTION_DEBLUR && (iterCount == m_para_icp_max_iterations - 1) )
+                                    // launch文件:MOTION_DEBLUR=0;
                                     if (MOTION_DEBLUR) {
                                         //assert( pointOri.intensity <= 1.0 );
                                         //assert( refine_blur( pointOri.intensity, m_min_blurs_s, m_max_blurs_s ) <= 1.0 );
@@ -1114,12 +1131,10 @@ public:
                                                         m_laser_cloud_surf_from_map->points[m_point_search_Idx[0]]),
                                                 pcl_pt_to_eigend(
                                                         m_laser_cloud_surf_from_map->points[m_point_search_Idx[
-                                                                plane_search_num /
-                                                                2]]),
+                                                                plane_search_num / 2]]),
                                                 pcl_pt_to_eigend(
                                                         m_laser_cloud_surf_from_map->points[m_point_search_Idx[
-                                                                plane_search_num -
-                                                                1]]),
+                                                                plane_search_num - 1]]),
                                                 BLUR_SCALE * refine_blur(
                                                         pointOri.intensity,
                                                         m_minimum_pt_time_stamp,
@@ -1137,12 +1152,10 @@ public:
                                                         m_laser_cloud_surf_from_map->points[m_point_search_Idx[0]]),
                                                 pcl_pt_to_eigend(
                                                         m_laser_cloud_surf_from_map->points[m_point_search_Idx[
-                                                                plane_search_num /
-                                                                2]]),
+                                                                plane_search_num / 2]]),
                                                 pcl_pt_to_eigend(
                                                         m_laser_cloud_surf_from_map->points[m_point_search_Idx[
-                                                                plane_search_num -
-                                                                1]]),
+                                                                plane_search_num - 1]]),
                                                 1.0,
                                                 Eigen::Matrix<double, 4, 1>(
                                                         m_q_w_last.w(),
@@ -1227,7 +1240,7 @@ public:
                     if (MOTION_DEBLUR) {
                         compute_interpolatation_rodrigue(m_q_w_incre,
                                                          m_interpolatation_omega,
-                                                         m_interpolatation_theta,
+                                                         m_interpolatation_theta, // = m_q_w_incre.angle();
                                                          m_interpolatation_omega_hat);
                         m_interpolatation_omega_hat_sq2 = m_interpolatation_omega_hat * m_interpolatation_omega_hat;
                     }
@@ -1273,6 +1286,8 @@ public:
                         surf_avail_num,
                         angular_diff,
                         t_diff);
+
+                // 错误匹配情况处理。
                 if (angular_diff > m_para_max_angular_rate || minimize_cost > m_max_final_cost) {
                     *(m_file_logger.get_ostream()) << "**** Reject update **** " << endl;
                     *(m_file_logger.get_ostream()) << summary.FullReport() << endl;
