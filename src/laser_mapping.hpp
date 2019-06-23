@@ -66,6 +66,8 @@
 #include "tools/logger.hpp"
 #include "tools/pcl_tools.hpp"
 
+#include <ctime>
+
 #define PUB_SURROUND_PTS 1
 #define PUB_DEBUG_INFO 1
 
@@ -600,6 +602,9 @@ public:
             Data_pair *current_data_pair = m_queue_avail_data.front();
             m_queue_avail_data.pop();
             m_mutex_buf.unlock();
+
+            clock_t startTime,endTime;
+            startTime=clock();
 
             m_time_pc_corner_past = current_data_pair->m_pc_corner->header.stamp.toSec();
 
@@ -1510,6 +1515,9 @@ public:
                     tf::StampedTransform(transform, odomAftMapped.header.stamp, "/camera_init", "/aft_mapped"));
 
             frameCount++;
+
+            endTime = clock();//计时结束
+            std::cout << "[INFO] The running time of frame matching is: " <<(double)(endTime - startTime) / CLOCKS_PER_SEC << "s." << std::endl;
         }
         std::chrono::nanoseconds dura(1);
         std::this_thread::sleep_for(dura);

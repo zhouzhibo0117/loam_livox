@@ -518,7 +518,6 @@ public:
                     if (edge_idx.size() == 0 || (idx - split_idx[split_idx.size() - 1]) > 50) {
                         split_idx.push_back(idx);
                         edge_idx.push_back(idx);
-                        flag1=true;
                         continue;
                     }
                 }
@@ -527,7 +526,6 @@ public:
                     if (zero_idx.size() == 0 || (idx - split_idx[split_idx.size() - 1]) > 50) {
                         split_idx.push_back(idx);
                         zero_idx.push_back(idx);
-                        flag2=true;
                         continue;
                     }
                 }
