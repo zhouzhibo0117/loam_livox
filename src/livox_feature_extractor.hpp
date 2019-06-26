@@ -634,7 +634,8 @@ public:
 
     // Split whole point cloud into scans.
     template<typename T>
-    void split_laser_scan(const int clutter_size, const pcl::PointCloud<T> &laserCloudIn,
+    void split_laser_scan(const int clutter_size,
+                          const pcl::PointCloud<T> &laserCloudIn,
                           const std::vector<float> &scan_id_index,
                           std::vector<pcl::PointCloud<PointType> > &laserCloudScans) {
         std::vector<std::vector<int> > pts_mask; // 存储点的类型 m_pts_info_vec[].pt_type。
