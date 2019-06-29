@@ -215,6 +215,7 @@ public:
 
     pcl::VoxelGrid<PointType> m_down_sample_filter_corner;
     pcl::VoxelGrid<PointType> m_down_sample_filter_surface;
+    pcl::VoxelGrid<PointType> m_down_sample_filter_map;
     pcl::StatisticalOutlierRemoval<PointType> m_filter_k_means;
 
     std::vector<int> m_point_search_Idx;
@@ -357,6 +358,7 @@ public:
         m_file_logger.printf("line resolution %f plane resolution %f \n", lineRes, planeRes);
         m_down_sample_filter_corner.setLeafSize(lineRes, lineRes, lineRes);
         m_down_sample_filter_surface.setLeafSize(planeRes, planeRes, planeRes);
+        m_down_sample_filter_map.setLeafSize(0.5, 0.5, 0.5);
 
         m_filter_k_means.setMeanK(m_kmean_filter_count);
         m_filter_k_means.setStddevMulThresh(m_kmean_filter_threshold);
@@ -1450,8 +1452,13 @@ public:
                                     refine_blur(m_laser_cloud_full_res->points[i].intensity, m_minimum_pt_time_stamp,
                                                 m_maximum_pt_time_stamp), 1);
             }
+
+            pcl::PointCloud<PointType>::Ptr laserCloudMapFiltered(new pcl::PointCloud<PointType>());
+            m_down_sample_filter_map.setInputCloud(m_laser_cloud_full_res);
+            m_down_sample_filter_map.filter(*laserCloudMapFiltered);
+
             sensor_msgs::PointCloud2 laserCloudFullRes3;
-            pcl::toROSMsg(*m_laser_cloud_full_res, laserCloudFullRes3);
+            pcl::toROSMsg(*laserCloudMapFiltered, laserCloudFullRes3);
             laserCloudFullRes3.header.stamp = ros::Time().fromSec(m_time_odom);
             laserCloudFullRes3.header.frame_id = "/camera_init";
             m_pub_laser_cloud_full_res.publish(laserCloudFullRes3); //single_frame_with_pose_tranfromed

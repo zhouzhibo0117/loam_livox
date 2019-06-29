@@ -57,9 +57,9 @@
 #include "tools/common.h"
 #include "tools/logger.hpp"
 
-#define LIVOX_NUM 1
-
-#define MAX_FRAME_GAP 0.01
+#define LIVOX_NUM 8
+#define LIVOX_NUM_MAX 32
+#define MAX_FRAME_GAP 0.01 //base: 0.01
 
 using std::atan2;
 using std::cos;
@@ -83,12 +83,15 @@ public:
     int m_odom_mode = 0; //0 = for odom, 1 = for mapping
     float m_plane_resolution;
     float m_line_resolution;
+    double livox_corners_curvature;
+    double livox_surface_curvature;
+    double minimum_view_angle;
     File_logger m_file_logger;
 
     bool m_if_pub_each_line = false;
     int m_lidar_type = 0; // 0 is velodyne, 1 is livox
     int m_laser_scan_number = 64;
-    Livox_laser m_livox[LIVOX_NUM];
+
     ros::Time m_init_timestamp;
 
     bool comp(int i, int j) {
@@ -116,7 +119,18 @@ public:
     pcl::VoxelGrid<PointType> m_voxel_filter_for_surface;
     pcl::VoxelGrid<PointType> m_voxel_filter_for_corner;
 
-    pcl::PointCloud<pcl::PointXYZI> laserCloudInAll[LIVOX_NUM];
+    pcl::PointCloud<pcl::PointXYZI>::Ptr laserCloudInAll[LIVOX_NUM];
+
+    // Calibration config.
+    struct CalibrationInfo {
+        double x;
+        double y;
+        double z;
+        double rx;
+        double ry;
+        double rz;
+    };
+    CalibrationInfo arr_livox_cali_info[LIVOX_NUM_MAX];
 
     int init_ros_env() {
         ros::NodeHandle nh;
@@ -130,17 +144,10 @@ public:
         nh.param<int>("if_motion_deblur", m_if_motion_deblur, 1);
         nh.param<int>("odom_mode", m_odom_mode, 0);
 
-        double livox_corners, livox_surface, minimum_view_angle;
-        nh.param<double>("corner_curvature", livox_corners, 0.05);
-        nh.param<double>("surface_curvature", livox_surface, 0.01);
-        nh.param<double>("minimum_view_angle", minimum_view_angle, 10);
 
-        for (int i = 0; i < LIVOX_NUM; ++i) {
-            m_livox[i].thr_corner_curvature = livox_corners;
-            m_livox[i].thr_surface_curvature = livox_surface;
-            m_livox[i].minimum_view_angle = minimum_view_angle;
-            //livox.m_livox_min_allow_dis = MINIMUM_RANGE;
-        }
+        nh.param<double>("corner_curvature", livox_corners_curvature, 0.05);
+        nh.param<double>("surface_curvature", livox_surface_curvature, 0.01);
+        nh.param<double>("minimum_view_angle", minimum_view_angle, 10);
 
         printf("scan line number %d \n", m_laser_scan_number);
 
@@ -215,10 +222,46 @@ public:
         cloud_out.is_dense = true;
     }
 
+    void TransfromToLivoxCoordinate(pcl::PointCloud<pcl::PointXYZI>::Ptr &cloud,
+                                    double tx, double ty, double tz,
+                                    double rx, double ry, double rz) {
+
+        for (int i = 0; i < cloud->points.size(); ++i) {
+            cloud->points[i].x -= tx;
+            cloud->points[i].y -= ty;
+            cloud->points[i].z -= tz;
+
+            double tempX = cloud->points[i].x;
+            double tempY = cloud->points[i].y;
+
+            cloud->points[i].x = cos(rz) * tempX + sin(rz) * tempY;
+            cloud->points[i].y = -sin(rz) * tempX + cos(rz) * tempY;
+
+        }
+
+    }
+
+    void TransfromToHubCoordinate(pcl::PointCloud<pcl::PointXYZI>::Ptr &cloud,
+                                  double tx, double ty, double tz,
+                                  double rx, double ry, double rz) {
+
+        for (int i = 0; i < cloud->points.size(); ++i) {
+            double tempX = cloud->points[i].x;
+            double tempY = cloud->points[i].y;
+
+            cloud->points[i].x = cos(rz) * tempX - sin(rz) * tempY + tx;
+            cloud->points[i].y = sin(rz) * tempX + cos(rz) * tempY + ty;
+            cloud->points[i].z += tz;
+
+        }
+
+    }
+
     // Lidar数据的回调函数，处理单帧lidar数据。
     void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg) {
 
         double timestamp = laserCloudMsg->header.stamp.toSec();
+        // double timestamp = ros::Time::now().toSec();
 
         // 系统延迟一段时间，再开始处理lidar数据。
         if (!m_para_systemInited) {
@@ -233,30 +276,28 @@ public:
         if (fabs(timestamp - timestamp_base_) > MAX_FRAME_GAP) {
             // Update timestamp base.
             timestamp_base_ = timestamp;
+            livox_count = 0;
+
+            for (int i = 0; i < LIVOX_NUM; ++i) {
+                laserCloudInAll[i].reset(new pcl::PointCloud<pcl::PointXYZI>());
+            }
         }
 
 
-        pcl::PointCloud<pcl::PointXYZI> laserCloudInSingle;
-        pcl::fromROSMsg(*laserCloudMsg, laserCloudInSingle);
+        pcl::PointCloud<pcl::PointXYZI>::Ptr laserCloudInSingle(new pcl::PointCloud<pcl::PointXYZI>);
+        pcl::fromROSMsg(*laserCloudMsg, *laserCloudInSingle);
         laserCloudInAll[livox_count] = laserCloudInSingle;
         livox_count++;
-        int raw_pts_num = laserCloudInSingle.size();
-
-        m_file_logger.printf(" Time: %.5f, num_raw: %d, num_filted: %d\r\n", laserCloudMsg->header.stamp.toSec(),
-                             raw_pts_num, laserCloudInSingle.size());
-
 
         if (livox_count == LIVOX_NUM) {
-
-            livox_count = 0;
 
             pcl::PointCloud<PointType>::Ptr livox_corners_all[LIVOX_NUM];
             pcl::PointCloud<PointType>::Ptr livox_surface_all[LIVOX_NUM];
             pcl::PointCloud<PointType>::Ptr livox_full_all[LIVOX_NUM];
 
-            pcl::PointCloud<PointType>::Ptr livox_corners;
-            pcl::PointCloud<PointType>::Ptr livox_surface;
-            pcl::PointCloud<PointType>::Ptr livox_full;
+            pcl::PointCloud<PointType>::Ptr livox_corners(new pcl::PointCloud<PointType>());
+            pcl::PointCloud<PointType>::Ptr livox_surface(new pcl::PointCloud<PointType>());
+            pcl::PointCloud<PointType>::Ptr livox_full(new pcl::PointCloud<PointType>());
 
 
             // 初始化。
@@ -269,17 +310,41 @@ public:
 
             for (int iter = 0; iter < LIVOX_NUM; ++iter) {
 
+                // TODO: 坐标变换到livox坐标系。
+                // Find livox id.
+                float raw_intensity = laserCloudInAll[iter]->points[0].intensity;
+                int livox_id = round((raw_intensity - float(int(raw_intensity))) * 1000);
+
+                // if(livox_id!=3)
+                // continue;
+
+                TransfromToLivoxCoordinate(laserCloudInAll[iter],
+                                           arr_livox_cali_info[livox_id].x,
+                                           arr_livox_cali_info[livox_id].y,
+                                           arr_livox_cali_info[livox_id].z,
+                                           arr_livox_cali_info[livox_id].rx,
+                                           arr_livox_cali_info[livox_id].ry,
+                                           arr_livox_cali_info[livox_id].rz);
+
+
                 std::vector<pcl::PointCloud<PointType>> laserCloudScans(m_laser_scan_number);
 
+                Livox_laser m_livox;
+
+                m_livox.thr_corner_curvature = livox_corners_curvature;
+                m_livox.thr_surface_curvature = livox_surface_curvature;
+                m_livox.minimum_view_angle = minimum_view_angle;
+
+
                 // 将点云分线到不同的laserCloudScans。livox和传统velodyne的方式有所不同。
-                laserCloudScans = m_livox[iter].extract_laser_features(laserCloudInAll[iter],
-                                                                       laserCloudMsg->header.stamp.toSec());
+                laserCloudScans = m_livox.extract_laser_features(laserCloudInAll[iter],
+                                                                 laserCloudMsg->header.stamp.toSec());
 
 
-                if (laserCloudScans.size() <= 0) // less than 5 scan
+                if (laserCloudScans.empty()) // less than 5 scan
                 {
                     ROS_WARN_STREAM("laserCloudScansAll.size()= " << laserCloudScans.size() << " !!!");
-                    return;
+                    continue;
                 }
 
                 m_laser_scan_number = laserCloudScans.size() * 1.0;
@@ -330,65 +395,90 @@ public:
                         int start_idx = 0;
                         int end_idx = laserCloudScans[end_scans].size() - 1;
                         piece_wise_start[i] =
-                                ((float) m_livox[iter].find_pt_info(
+                                ((float) m_livox.find_pt_info(
                                         laserCloudScans[start_scans].points[start_idx])->idx) /
-                                m_livox[iter].m_pts_info_vec.size();
+                                m_livox.m_pts_info_vec.size();
                         // printf( "Max scan number = %d, start = %d, end  = %d, %d \r\n", m_laser_scan_number, start_scans, end_scans, end_idx );
                         // cout << "Start pt: " << laserCloudScans[ start_scans ].points[ 0 ] << endl;
                         // cout << "End pt: " << laserCloudScans[ end_scans ].points[ end_idx ] << endl;
                         piece_wise_end[i] =
-                                ((float) m_livox[iter].find_pt_info(laserCloudScans[end_scans].points[end_idx])->idx) /
-                                m_livox[iter].m_pts_info_vec.size();
+                                ((float) m_livox.find_pt_info(laserCloudScans[end_scans].points[end_idx])->idx) /
+                                m_livox.m_pts_info_vec.size();
                     }
 
                     for (int i = 0; i < piece_wise; i++) {
 
 
-                        m_livox[iter].get_features(*livox_corners_all[iter],
-                                                   *livox_surface_all[iter],
-                                                   *livox_full_all[iter],
-                                                   piece_wise_start[i],
-                                                   piece_wise_end[i]);
+                        m_livox.get_features(*livox_corners_all[iter],
+                                             *livox_surface_all[iter],
+                                             *livox_full_all[iter],
+                                             piece_wise_start[i],
+                                             piece_wise_end[i]);
 
                     }
                 }
+
+
+
+                // TODO: 坐标变换回去
+                TransfromToHubCoordinate(livox_corners_all[iter],
+                                         arr_livox_cali_info[livox_id].x,
+                                         arr_livox_cali_info[livox_id].y,
+                                         arr_livox_cali_info[livox_id].z,
+                                         arr_livox_cali_info[livox_id].rx,
+                                         arr_livox_cali_info[livox_id].ry,
+                                         arr_livox_cali_info[livox_id].rz);
+
+                TransfromToHubCoordinate(livox_surface_all[iter],
+                                         arr_livox_cali_info[livox_id].x,
+                                         arr_livox_cali_info[livox_id].y,
+                                         arr_livox_cali_info[livox_id].z,
+                                         arr_livox_cali_info[livox_id].rx,
+                                         arr_livox_cali_info[livox_id].ry,
+                                         arr_livox_cali_info[livox_id].rz);
+
+                TransfromToHubCoordinate(livox_full_all[iter],
+                                         arr_livox_cali_info[livox_id].x,
+                                         arr_livox_cali_info[livox_id].y,
+                                         arr_livox_cali_info[livox_id].z,
+                                         arr_livox_cali_info[livox_id].rx,
+                                         arr_livox_cali_info[livox_id].ry,
+                                         arr_livox_cali_info[livox_id].rz);
+
+                // 叠加livox_corners_all[].
+                *livox_full += *livox_full_all[iter];
+                *livox_surface += *livox_surface_all[iter];
+                *livox_corners += *livox_corners_all[iter];
+
             }
 
-            // 叠加livox_corners_all[].
 
-            livox_full.reset(new pcl::PointCloud<PointType>());
-            livox_corners.reset(new pcl::PointCloud<PointType>());
-            livox_surface.reset(new pcl::PointCloud<PointType>());
+            if (livox_surface->points.size() > 0 &&
+                livox_corners->points.size() > 0 &&
+                livox_full->points.size() > 10) {
 
-            for (int i = 0; i < LIVOX_NUM; ++i) {
-                *livox_full += *livox_full_all[i];
-                *livox_surface += *livox_surface_all[i];
-                *livox_corners += *livox_corners_all[i];
+                ros::Time current_time = ros::Time::now();
+
+                pcl::toROSMsg(*livox_full, temp_out_msg);
+                temp_out_msg.header.stamp = current_time;
+                temp_out_msg.header.frame_id = "/camera_init";
+                m_pub_pc_livox_full.publish(temp_out_msg);
+
+                m_voxel_filter_for_surface.setInputCloud(livox_surface);
+                m_voxel_filter_for_surface.filter(*livox_surface);
+                pcl::toROSMsg(*livox_surface, temp_out_msg);
+                temp_out_msg.header.stamp = current_time;
+                temp_out_msg.header.frame_id = "/camera_init";
+                m_pub_pc_livox_surface.publish(temp_out_msg);
+
+                m_voxel_filter_for_corner.setInputCloud(livox_corners);
+                m_voxel_filter_for_corner.filter(*livox_corners);
+                pcl::toROSMsg(*livox_corners, temp_out_msg);
+                temp_out_msg.header.stamp = current_time;
+                temp_out_msg.header.frame_id = "/camera_init";
+                m_pub_pc_livox_corners.publish(temp_out_msg);
             }
 
-
-            ros::Time current_time = ros::Time::now();
-
-            pcl::toROSMsg(*livox_full, temp_out_msg);
-            temp_out_msg.header.stamp = current_time;
-            temp_out_msg.header.frame_id = "/camera_init";
-            m_pub_pc_livox_full.publish(temp_out_msg);
-
-            m_voxel_filter_for_surface.setInputCloud(livox_surface);
-            m_voxel_filter_for_surface.filter(*livox_surface);
-            pcl::toROSMsg(*livox_surface, temp_out_msg);
-            temp_out_msg.header.stamp = current_time;
-            temp_out_msg.header.frame_id = "/camera_init";
-            m_pub_pc_livox_surface.publish(temp_out_msg);
-
-            m_voxel_filter_for_corner.setInputCloud(livox_corners);
-            m_voxel_filter_for_corner.filter(*livox_corners);
-            pcl::toROSMsg(*livox_corners, temp_out_msg);
-            temp_out_msg.header.stamp = current_time;
-            temp_out_msg.header.frame_id = "/camera_init";
-            m_pub_pc_livox_corners.publish(temp_out_msg);
-
-            return;
 
         }
     }
@@ -412,17 +502,29 @@ public:
             std::cout << "Set lidar type = velodyne" << std::endl;
         }
 
-        for (int i = 0; i < LIVOX_NUM; ++i) {
-            if (ros::param::get("livox_min_dis", m_livox[i].m_livox_min_allow_dis)) {
-                std::cout << "Set livox lidar" << i << " minimum distance= " << m_livox[i].m_livox_min_allow_dis
-                          << std::endl;
-            }
+//
+//            if (ros::param::get("livox_min_dis", m_livox[i].m_livox_min_allow_dis)) {
+//                std::cout << "Set livox lidar minimum distance= " << m_livox[i].m_livox_min_allow_dis
+//                          << std::endl;
+//            }
+//
+//            if (ros::param::get("livox_min_sigma", m_livox[i].m_livox_min_sigma)) {
+//                std::cout << "Set livox lidar minimum sigama =  " << m_livox[i].m_livox_min_sigma
+//                          << std::endl;
+//            }
 
-            if (ros::param::get("livox_min_sigma", m_livox[i].m_livox_min_sigma)) {
-                std::cout << "Set livox lidar " << i << " minimum sigama =  " << m_livox[i].m_livox_min_sigma
-                          << std::endl;
-            }
-        }
+
+        // Calibration init.
+        // arr_livox_cali_info[0] = {0, 0,0, 0, 0,0};
+        arr_livox_cali_info[0] = {-0.16, -0.16, 0.737 - 0.0737, 0, 0, -0.75 * M_PI};
+        arr_livox_cali_info[3] = {0.18, -0.18, 0.397 - 0.0397, 0, 0, -0.2417 * M_PI + 0.167 * M_PI};
+        arr_livox_cali_info[4] = {0.18, -0.18, 0.397 - 0.0397, 0, 0, -0.2417 * M_PI};
+        arr_livox_cali_info[5] = {0.18, -0.18, 0.397 - 0.0397, 0, 0, -0.2417 * M_PI - 0.167 * M_PI};
+        arr_livox_cali_info[21] = {-0.16, 0.16, 0.737 - 0.0737, 0, 0, 0.75 * M_PI};
+        arr_livox_cali_info[24] = {0.18, 0.18, 0.397 - 0.0397, 0, 0, 0.25 * M_PI + 0.167 * M_PI};
+        arr_livox_cali_info[25] = {0.18, 0.18, 0.397 - 0.0397, 0, 0, 0.25 * M_PI};
+        arr_livox_cali_info[26] = {0.18, 0.18, 0.397 - 0.0397, 0, 0, 0.25 * M_PI - 0.167 * M_PI};
+
         std::cout << "~~~~~ End ~~~~~" << endl;
     }
 };

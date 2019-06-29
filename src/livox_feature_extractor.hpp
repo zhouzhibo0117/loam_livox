@@ -698,9 +698,8 @@ public:
         //printf_line;
     }
 
-    template<typename T>
     std::vector<pcl::PointCloud<pcl::PointXYZI> >
-    extract_laser_features(pcl::PointCloud<T> &laserCloudIn, double time_stamp = -1) {
+    extract_laser_features(pcl::PointCloud<pcl::PointXYZI>::Ptr &laserCloudIn, double time_stamp = -1) {
         //printf_line;
         assert(time_stamp >= 0.0);
         if (time_stamp == 0) // old firmware, without timestamp
@@ -718,21 +717,26 @@ public:
         std::vector<float> scan_id_index;
         laserCloudScans.clear();
         m_map_pt_idx.clear();
+
+        if(laserCloudIn->points.size()==0){
+            return laserCloudScans;
+        }
+
         //printf_line;
         if (m_if_save_pcd_file) {
             stringstream ss;
             ss << PCL_DATA_SAVE_DIR << "/pc_" << pcl_data_save_index << ".pcd" << endl;
             pcl_data_save_index = pcl_data_save_index + 1;
             std::cout << "Save file = " << ss.str() << endl;
-            pcl::io::savePCDFileASCII(ss.str(), laserCloudIn);
+            pcl::io::savePCDFileASCII(ss.str(), *laserCloudIn);
         }
 
-        int clutter_size = projection_scan_3d_2d(laserCloudIn, scan_id_index);
+        int clutter_size = projection_scan_3d_2d(*laserCloudIn, scan_id_index);
         compute_features();
         if (clutter_size == 0) {
             return laserCloudScans;
         } else {
-            split_laser_scan(clutter_size, laserCloudIn, scan_id_index, laserCloudScans);
+            split_laser_scan(clutter_size, *laserCloudIn, scan_id_index, laserCloudScans);
             return laserCloudScans;
         }
     }
