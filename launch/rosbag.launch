@@ -32,7 +32,7 @@
     <param name="maximum_mapping_buffer" type="int" value="2"/>
 
     <node pkg="loam_livox" type="livox_scanRegistration" name="livox_scanRegistration" output="screen" >
-     <remap from="/laser_points" to="/livox/hub" />
+     <remap from="/laser_points" to="/livox/hub_all" />
     </node>
 
     <node pkg="loam_livox" type="livox_laserMapping" name="livox_laserMapping" output="screen" />

@@ -31,7 +31,7 @@
 
 
     <node pkg="loam_livox" type="livox_scanRegistration" name="livox_scanRegistration" output="screen" >
-     <remap from="/laser_points" to="/livox/lidar" />
+     <remap from="/laser_points" to="/livox/hub_all" />
     </node>
 
     <!-- <node pkg="livox_loam" type="livox_laserOdometry" name="livox_laserOdometry" output="screen" /> -->

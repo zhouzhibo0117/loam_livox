@@ -7,13 +7,9 @@ Panels:
         - /Global Options1
         - /Status1
         - /Axes1
-        - /odometry1
         - /odometry1/odomPath1
         - /odometry1/PointCloud21
         - /mapping1
-        - /mapping1/mappingPath1
-        - /mapping1/allMapCloud1
-        - /mapping1/surround1
         - /mapping1/currPoints1
         - /Debug1/PointCloud21
         - /Debug1/PointCloud22
@@ -277,15 +273,15 @@ Visualization Manager:
         - Alpha: 0.5
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
-            Max Value: 24.5984993
-            Min Value: -2.70700002
+            Max Value: 19.0470009
+            Min Value: -66.3509979
             Value: true
           Axis: Z
           Channel Name: intensity
           Class: rviz/PointCloud2
           Color: 255; 255; 255
           Color Transformer: AxisColor
-          Decay Time: 30
+          Decay Time: 1000
           Enabled: true
           Invert Rainbow: true
           Max Color: 255; 255; 255
@@ -689,7 +685,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/ThirdPersonFollower
-      Distance: 48.2136841
+      Distance: 57.1000214
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.0599999987
         Stereo Focal Distance: 1
@@ -704,10 +700,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.00999999978
-      Pitch: 0.440398067
+      Pitch: 1.30479658
       Target Frame: body
       Value: ThirdPersonFollower (rviz)
-      Yaw: 3.54539967
+      Yaw: 4.46540785
     Saved: ~
 Window Geometry:
   Displays:

@@ -57,9 +57,8 @@
 #include "tools/common.h"
 #include "tools/logger.hpp"
 
-#define LIVOX_NUM 8
+#define LIVOX_NUM 12
 #define LIVOX_NUM_MAX 32
-#define MAX_FRAME_GAP 0.01 //base: 0.01
 
 using std::atan2;
 using std::cos;
@@ -110,16 +109,12 @@ public:
 
     double MINIMUM_RANGE = 0.01;
 
-    double timestamp_base_ = 0.0;
-
-    int livox_count = 0;
-
     ros::Publisher m_pub_pc_livox_corners, m_pub_pc_livox_surface, m_pub_pc_livox_full;
     sensor_msgs::PointCloud2 temp_out_msg;
     pcl::VoxelGrid<PointType> m_voxel_filter_for_surface;
     pcl::VoxelGrid<PointType> m_voxel_filter_for_corner;
 
-    pcl::PointCloud<pcl::PointXYZI>::Ptr laserCloudInAll[LIVOX_NUM];
+    pcl::PointCloud<pcl::PointXYZI>::Ptr laserCloudInAll[LIVOX_NUM_MAX];
 
     // Calibration config.
     struct CalibrationInfo {
@@ -131,6 +126,7 @@ public:
         double rz;
     };
     CalibrationInfo arr_livox_cali_info[LIVOX_NUM_MAX];
+    std::vector<int> livox_id_index_vec;
 
     int init_ros_env() {
         ros::NodeHandle nh;
@@ -273,211 +269,227 @@ public:
                 return;
         }
 
-        if (fabs(timestamp - timestamp_base_) > MAX_FRAME_GAP) {
-            // Update timestamp base.
-            timestamp_base_ = timestamp;
-            livox_count = 0;
 
-            for (int i = 0; i < LIVOX_NUM; ++i) {
-                laserCloudInAll[i].reset(new pcl::PointCloud<pcl::PointXYZI>());
-            }
+        for (int i = 0; i < LIVOX_NUM_MAX; ++i) {
+            laserCloudInAll[i].reset(new pcl::PointCloud<pcl::PointXYZI>());
+        }
+
+        pcl::PointCloud<pcl::PointXYZI>::Ptr laserCloudIn(new pcl::PointCloud<pcl::PointXYZI>);
+        pcl::fromROSMsg(*laserCloudMsg, *laserCloudIn);
+
+        for (int i = 0; i < laserCloudIn->points.size(); ++i) {
+            float raw_intensity = laserCloudIn->points[i].intensity;
+            int livox_id = round((raw_intensity - float(int(raw_intensity))) * 1000);
+
+            // Transfrom to Livox coordinate.
+            laserCloudIn->points[i].z -= arr_livox_cali_info[livox_id].z;
+
+            double tempX = laserCloudIn->points[i].x - arr_livox_cali_info[livox_id].x;
+            double tempY = laserCloudIn->points[i].y - arr_livox_cali_info[livox_id].y;
+
+            laserCloudIn->points[i].x =
+                    cos(arr_livox_cali_info[livox_id].rz) * tempX + sin(arr_livox_cali_info[livox_id].rz) * tempY;
+            laserCloudIn->points[i].y =
+                    -sin(arr_livox_cali_info[livox_id].rz) * tempX + cos(arr_livox_cali_info[livox_id].rz) * tempY;
+
+            laserCloudInAll[livox_id]->push_back(laserCloudIn->points[i]);
+
+        }
+
+//        laserCloudInAll[livox_count] = laserCloudInSingle;
+//        livox_count++;
+
+//        if (/*livox_count == LIVOX_NUM*/true) {
+
+        pcl::PointCloud<PointType>::Ptr livox_corners_all[LIVOX_NUM];
+        pcl::PointCloud<PointType>::Ptr livox_surface_all[LIVOX_NUM];
+        pcl::PointCloud<PointType>::Ptr livox_full_all[LIVOX_NUM];
+
+        pcl::PointCloud<PointType>::Ptr livox_corners(new pcl::PointCloud<PointType>());
+        pcl::PointCloud<PointType>::Ptr livox_surface(new pcl::PointCloud<PointType>());
+        pcl::PointCloud<PointType>::Ptr livox_full(new pcl::PointCloud<PointType>());
+
+
+        // 初始化。
+        for (int i = 0; i < LIVOX_NUM; ++i) {
+            livox_corners_all[i].reset(new pcl::PointCloud<PointType>());
+            livox_surface_all[i].reset(new pcl::PointCloud<PointType>());
+            livox_full_all[i].reset(new pcl::PointCloud<PointType>());
         }
 
 
-        pcl::PointCloud<pcl::PointXYZI>::Ptr laserCloudInSingle(new pcl::PointCloud<pcl::PointXYZI>);
-        pcl::fromROSMsg(*laserCloudMsg, *laserCloudInSingle);
-        laserCloudInAll[livox_count] = laserCloudInSingle;
-        livox_count++;
+        for (int iter = 0; iter < LIVOX_NUM; ++iter) {
 
-        if (livox_count == LIVOX_NUM) {
+            int livox_id = livox_id_index_vec[iter];
 
-            pcl::PointCloud<PointType>::Ptr livox_corners_all[LIVOX_NUM];
-            pcl::PointCloud<PointType>::Ptr livox_surface_all[LIVOX_NUM];
-            pcl::PointCloud<PointType>::Ptr livox_full_all[LIVOX_NUM];
+//                // 坐标变换到livox坐标系。
+//                // Find livox id.
+//                float raw_intensity = laserCloudInAll[iter]->points[0].intensity;
+//                int livox_id = round((raw_intensity - float(int(raw_intensity))) * 1000);
+//
+//                TransfromToLivoxCoordinate(laserCloudInAll[iter],
+//                                           arr_livox_cali_info[livox_id].x,
+//                                           arr_livox_cali_info[livox_id].y,
+//                                           arr_livox_cali_info[livox_id].z,
+//                                           arr_livox_cali_info[livox_id].rx,
+//                                           arr_livox_cali_info[livox_id].ry,
+//                                           arr_livox_cali_info[livox_id].rz);
 
-            pcl::PointCloud<PointType>::Ptr livox_corners(new pcl::PointCloud<PointType>());
-            pcl::PointCloud<PointType>::Ptr livox_surface(new pcl::PointCloud<PointType>());
-            pcl::PointCloud<PointType>::Ptr livox_full(new pcl::PointCloud<PointType>());
+
+            std::vector<pcl::PointCloud<PointType>> laserCloudScans(m_laser_scan_number);
+
+            Livox_laser m_livox;
+
+            m_livox.thr_corner_curvature = livox_corners_curvature;
+            m_livox.thr_surface_curvature = livox_surface_curvature;
+            m_livox.minimum_view_angle = minimum_view_angle;
 
 
-            // 初始化。
-            for (int i = 0; i < LIVOX_NUM; ++i) {
-                livox_corners_all[i].reset(new pcl::PointCloud<PointType>());
-                livox_surface_all[i].reset(new pcl::PointCloud<PointType>());
-                livox_full_all[i].reset(new pcl::PointCloud<PointType>());
+            // 将点云分线到不同的laserCloudScans。livox和传统velodyne的方式有所不同。
+            laserCloudScans = m_livox.extract_laser_features(laserCloudInAll[livox_id],
+                                                             laserCloudMsg->header.stamp.toSec());
+
+
+            if (laserCloudScans.empty()) // less than 5 scan
+            {
+                ROS_WARN_STREAM("laserCloudScansAll.size()= " << laserCloudScans.size() << " !!!");
+                continue;
             }
 
+            m_laser_scan_number = laserCloudScans.size() * 1.0;
 
-            for (int iter = 0; iter < LIVOX_NUM; ++iter) {
+            //    std::vector< int > scanStartInd( N_SCANS*10, 0 );
+            //    std::vector< int > scanEndInd( N_SCANS*10, 0 );
+            // 保存玫瑰花瓣scan的起始点的索引坐标。
+            std::vector<int> scanStartInd(1000, 0);
+            std::vector<int> scanEndInd(1000, 0);
 
-                // TODO: 坐标变换到livox坐标系。
-                // Find livox id.
-                float raw_intensity = laserCloudInAll[iter]->points[0].intensity;
-                int livox_id = round((raw_intensity - float(int(raw_intensity))) * 1000);
+            //        N_SCANS = laserCloudScans.size()/4;
+            //N_SCANS = 16;
+            scanStartInd.resize(m_laser_scan_number);
+            scanEndInd.resize(m_laser_scan_number);
+            std::fill(scanStartInd.begin(), scanStartInd.end(), 0);
+            std::fill(scanEndInd.begin(), scanEndInd.end(), 0);
 
-                TransfromToLivoxCoordinate(laserCloudInAll[iter],
-                                           arr_livox_cali_info[livox_id].x,
-                                           arr_livox_cali_info[livox_id].y,
-                                           arr_livox_cali_info[livox_id].z,
-                                           arr_livox_cali_info[livox_id].rx,
-                                           arr_livox_cali_info[livox_id].ry,
-                                           arr_livox_cali_info[livox_id].rz);
-
-
-                std::vector<pcl::PointCloud<PointType>> laserCloudScans(m_laser_scan_number);
-
-                Livox_laser m_livox;
-
-                m_livox.thr_corner_curvature = livox_corners_curvature;
-                m_livox.thr_surface_curvature = livox_surface_curvature;
-                m_livox.minimum_view_angle = minimum_view_angle;
-
-
-                // 将点云分线到不同的laserCloudScans。livox和传统velodyne的方式有所不同。
-                laserCloudScans = m_livox.extract_laser_features(laserCloudInAll[iter],
-                                                                 laserCloudMsg->header.stamp.toSec());
-
-
-                if (laserCloudScans.empty()) // less than 5 scan
-                {
-                    ROS_WARN_STREAM("laserCloudScansAll.size()= " << laserCloudScans.size() << " !!!");
-                    continue;
-                }
-
-                m_laser_scan_number = laserCloudScans.size() * 1.0;
-
-                //    std::vector< int > scanStartInd( N_SCANS*10, 0 );
-                //    std::vector< int > scanEndInd( N_SCANS*10, 0 );
-                // 保存玫瑰花瓣scan的起始点的索引坐标。
-                std::vector<int> scanStartInd(1000, 0);
-                std::vector<int> scanEndInd(1000, 0);
-
-                //        N_SCANS = laserCloudScans.size()/4;
-                //N_SCANS = 16;
-                scanStartInd.resize(m_laser_scan_number);
-                scanEndInd.resize(m_laser_scan_number);
-                std::fill(scanStartInd.begin(), scanStartInd.end(), 0);
-                std::fill(scanEndInd.begin(), scanEndInd.end(), 0);
-
-                if (m_if_pub_debug_feature) {
-                    /********************************************
-                    *    Feature extraction for livox lidar     *
-                    ********************************************/
-                    // 将单帧点云分成三份进行处理。
+            if (m_if_pub_debug_feature) {
+                /********************************************
+                *    Feature extraction for livox lidar     *
+                ********************************************/
+                // 将单帧点云分成三份进行处理。
 //                int piece_wise = 3;
-                    // TODO: 为什么分成3份？效果非常垃圾。改成1之后效果明显变好。
-                    int piece_wise = 1;
-                    /*if ( m_if_motion_deblur )
+                // TODO: 为什么分成3份？效果非常垃圾。改成1之后效果明显变好。
+                int piece_wise = 1;
+                /*if ( m_if_motion_deblur )
+                {
+                    piece_wise = 1;
+                }*/
+                vector<float> piece_wise_start(piece_wise); // 小于1的比例量。
+                vector<float> piece_wise_end(piece_wise);
+
+                for (int i = 0; i < piece_wise; i++) {
+                    int start_scans, end_scans;
+                    /*if ( i != 0 )
                     {
-                        piece_wise = 1;
+                        start_scans = int( ( m_laser_scan_number * (i)  ) / piece_wise ) -1 ;
+                        end_scans = int( ( m_laser_scan_number * ( i + 1 ) ) / piece_wise ) - 1;
+                    }
+                    else
+                    {
+                        start_scans = 0;
+                        end_scans = int( ( m_laser_scan_number * ( 1 ) ) / piece_wise ) ;
                     }*/
-                    vector<float> piece_wise_start(piece_wise); // 小于1的比例量。
-                    vector<float> piece_wise_end(piece_wise);
+                    start_scans = int((m_laser_scan_number * (i)) / piece_wise);
+                    end_scans = int((m_laser_scan_number * (i + 1)) / piece_wise) - 1;
 
-                    for (int i = 0; i < piece_wise; i++) {
-                        int start_scans, end_scans;
-                        /*if ( i != 0 )
-                        {
-                            start_scans = int( ( m_laser_scan_number * (i)  ) / piece_wise ) -1 ;
-                            end_scans = int( ( m_laser_scan_number * ( i + 1 ) ) / piece_wise ) - 1;
-                        }
-                        else
-                        {
-                            start_scans = 0;
-                            end_scans = int( ( m_laser_scan_number * ( 1 ) ) / piece_wise ) ;
-                        }*/
-                        start_scans = int((m_laser_scan_number * (i)) / piece_wise);
-                        end_scans = int((m_laser_scan_number * (i + 1)) / piece_wise) - 1;
-
-                        int start_idx = 0;
-                        int end_idx = laserCloudScans[end_scans].size() - 1;
-                        piece_wise_start[i] =
-                                ((float) m_livox.find_pt_info(
-                                        laserCloudScans[start_scans].points[start_idx])->idx) /
-                                m_livox.m_pts_info_vec.size();
-                        // printf( "Max scan number = %d, start = %d, end  = %d, %d \r\n", m_laser_scan_number, start_scans, end_scans, end_idx );
-                        // cout << "Start pt: " << laserCloudScans[ start_scans ].points[ 0 ] << endl;
-                        // cout << "End pt: " << laserCloudScans[ end_scans ].points[ end_idx ] << endl;
-                        piece_wise_end[i] =
-                                ((float) m_livox.find_pt_info(laserCloudScans[end_scans].points[end_idx])->idx) /
-                                m_livox.m_pts_info_vec.size();
-                    }
-
-                    for (int i = 0; i < piece_wise; i++) {
-
-
-                        m_livox.get_features(*livox_corners_all[iter],
-                                             *livox_surface_all[iter],
-                                             *livox_full_all[iter],
-                                             piece_wise_start[i],
-                                             piece_wise_end[i]);
-
-                    }
+                    int start_idx = 0;
+                    int end_idx = laserCloudScans[end_scans].size() - 1;
+                    piece_wise_start[i] =
+                            ((float) m_livox.find_pt_info(
+                                    laserCloudScans[start_scans].points[start_idx])->idx) /
+                            m_livox.m_pts_info_vec.size();
+                    // printf( "Max scan number = %d, start = %d, end  = %d, %d \r\n", m_laser_scan_number, start_scans, end_scans, end_idx );
+                    // cout << "Start pt: " << laserCloudScans[ start_scans ].points[ 0 ] << endl;
+                    // cout << "End pt: " << laserCloudScans[ end_scans ].points[ end_idx ] << endl;
+                    piece_wise_end[i] =
+                            ((float) m_livox.find_pt_info(laserCloudScans[end_scans].points[end_idx])->idx) /
+                            m_livox.m_pts_info_vec.size();
                 }
 
+                for (int i = 0; i < piece_wise; i++) {
 
 
-                // TODO: 坐标变换回去
-                TransfromToHubCoordinate(livox_corners_all[iter],
-                                         arr_livox_cali_info[livox_id].x,
-                                         arr_livox_cali_info[livox_id].y,
-                                         arr_livox_cali_info[livox_id].z,
-                                         arr_livox_cali_info[livox_id].rx,
-                                         arr_livox_cali_info[livox_id].ry,
-                                         arr_livox_cali_info[livox_id].rz);
+                    m_livox.get_features(*livox_corners_all[iter],
+                                         *livox_surface_all[iter],
+                                         *livox_full_all[iter],
+                                         piece_wise_start[i],
+                                         piece_wise_end[i]);
 
-                TransfromToHubCoordinate(livox_surface_all[iter],
-                                         arr_livox_cali_info[livox_id].x,
-                                         arr_livox_cali_info[livox_id].y,
-                                         arr_livox_cali_info[livox_id].z,
-                                         arr_livox_cali_info[livox_id].rx,
-                                         arr_livox_cali_info[livox_id].ry,
-                                         arr_livox_cali_info[livox_id].rz);
-
-                TransfromToHubCoordinate(livox_full_all[iter],
-                                         arr_livox_cali_info[livox_id].x,
-                                         arr_livox_cali_info[livox_id].y,
-                                         arr_livox_cali_info[livox_id].z,
-                                         arr_livox_cali_info[livox_id].rx,
-                                         arr_livox_cali_info[livox_id].ry,
-                                         arr_livox_cali_info[livox_id].rz);
-
-                // 叠加livox_corners_all[].
-                *livox_full += *livox_full_all[iter];
-                *livox_surface += *livox_surface_all[iter];
-                *livox_corners += *livox_corners_all[iter];
-
+                }
             }
 
 
-            if (livox_surface->points.size() > 0 &&
-                livox_corners->points.size() > 0 &&
-                livox_full->points.size() > 10) {
 
-                ros::Time current_time = ros::Time::now();
+            // TODO: 坐标变换回去
+            TransfromToHubCoordinate(livox_corners_all[iter],
+                                     arr_livox_cali_info[livox_id].x,
+                                     arr_livox_cali_info[livox_id].y,
+                                     arr_livox_cali_info[livox_id].z,
+                                     arr_livox_cali_info[livox_id].rx,
+                                     arr_livox_cali_info[livox_id].ry,
+                                     arr_livox_cali_info[livox_id].rz);
 
-                pcl::toROSMsg(*livox_full, temp_out_msg);
-                temp_out_msg.header.stamp = current_time;
-                temp_out_msg.header.frame_id = "/camera_init";
-                m_pub_pc_livox_full.publish(temp_out_msg);
+            TransfromToHubCoordinate(livox_surface_all[iter],
+                                     arr_livox_cali_info[livox_id].x,
+                                     arr_livox_cali_info[livox_id].y,
+                                     arr_livox_cali_info[livox_id].z,
+                                     arr_livox_cali_info[livox_id].rx,
+                                     arr_livox_cali_info[livox_id].ry,
+                                     arr_livox_cali_info[livox_id].rz);
 
-                m_voxel_filter_for_surface.setInputCloud(livox_surface);
-                m_voxel_filter_for_surface.filter(*livox_surface);
-                pcl::toROSMsg(*livox_surface, temp_out_msg);
-                temp_out_msg.header.stamp = current_time;
-                temp_out_msg.header.frame_id = "/camera_init";
-                m_pub_pc_livox_surface.publish(temp_out_msg);
+            TransfromToHubCoordinate(livox_full_all[iter],
+                                     arr_livox_cali_info[livox_id].x,
+                                     arr_livox_cali_info[livox_id].y,
+                                     arr_livox_cali_info[livox_id].z,
+                                     arr_livox_cali_info[livox_id].rx,
+                                     arr_livox_cali_info[livox_id].ry,
+                                     arr_livox_cali_info[livox_id].rz);
 
-                m_voxel_filter_for_corner.setInputCloud(livox_corners);
-                m_voxel_filter_for_corner.filter(*livox_corners);
-                pcl::toROSMsg(*livox_corners, temp_out_msg);
-                temp_out_msg.header.stamp = current_time;
-                temp_out_msg.header.frame_id = "/camera_init";
-                m_pub_pc_livox_corners.publish(temp_out_msg);
-            }
-
+            // 叠加livox_corners_all[].
+            *livox_full += *livox_full_all[iter];
+            *livox_surface += *livox_surface_all[iter];
+            *livox_corners += *livox_corners_all[iter];
 
         }
+
+
+        if (livox_surface->points.size() > 0 &&
+            livox_corners->points.size() > 0 &&
+            livox_full->points.size() > 10) {
+
+            ros::Time current_time = ros::Time::now();
+
+            pcl::toROSMsg(*livox_full, temp_out_msg);
+            temp_out_msg.header.stamp = current_time;
+            temp_out_msg.header.frame_id = "/camera_init";
+            m_pub_pc_livox_full.publish(temp_out_msg);
+
+            m_voxel_filter_for_surface.setInputCloud(livox_surface);
+            m_voxel_filter_for_surface.filter(*livox_surface);
+            pcl::toROSMsg(*livox_surface, temp_out_msg);
+            temp_out_msg.header.stamp = current_time;
+            temp_out_msg.header.frame_id = "/camera_init";
+            m_pub_pc_livox_surface.publish(temp_out_msg);
+
+            m_voxel_filter_for_corner.setInputCloud(livox_corners);
+            m_voxel_filter_for_corner.filter(*livox_corners);
+            pcl::toROSMsg(*livox_corners, temp_out_msg);
+            temp_out_msg.header.stamp = current_time;
+            temp_out_msg.header.frame_id = "/camera_init";
+            m_pub_pc_livox_corners.publish(temp_out_msg);
+        }
+
+
+//        }
     }
 
     void init_livox_lidar_para() {
@@ -511,16 +523,44 @@ public:
 //            }
 
 
+        // Livov id index vector.
+        livox_id_index_vec.push_back(24); // left front
+        livox_id_index_vec.push_back(25);
+        livox_id_index_vec.push_back(26);
+        livox_id_index_vec.push_back(18); // right front
+        livox_id_index_vec.push_back(19);
+        livox_id_index_vec.push_back(20);
+        livox_id_index_vec.push_back(21); // left back
+        livox_id_index_vec.push_back(22);
+        livox_id_index_vec.push_back(23);
+        livox_id_index_vec.push_back(0);  // right back
+        livox_id_index_vec.push_back(1);
+        livox_id_index_vec.push_back(2);
+
         // Calibration init.
         // arr_livox_cali_info[0] = {0, 0,0, 0, 0,0};
-        arr_livox_cali_info[0] = {-0.16, -0.16, 0.737 - 0.0737, 0, 0, -0.75 * M_PI};
-        arr_livox_cali_info[3] = {0.18, -0.18, 0.397 - 0.0397, 0, 0, -0.2417 * M_PI + 0.167 * M_PI};
-        arr_livox_cali_info[4] = {0.18, -0.18, 0.397 - 0.0397, 0, 0, -0.2417 * M_PI};
-        arr_livox_cali_info[5] = {0.18, -0.18, 0.397 - 0.0397, 0, 0, -0.2417 * M_PI - 0.167 * M_PI};
-        arr_livox_cali_info[21] = {-0.16, 0.16, 0.737 - 0.0737, 0, 0, 0.75 * M_PI};
-        arr_livox_cali_info[24] = {0.18, 0.18, 0.397 - 0.0397, 0, 0, 0.25 * M_PI + 0.167 * M_PI};
-        arr_livox_cali_info[25] = {0.18, 0.18, 0.397 - 0.0397, 0, 0, 0.25 * M_PI};
-        arr_livox_cali_info[26] = {0.18, 0.18, 0.397 - 0.0397, 0, 0, 0.25 * M_PI - 0.167 * M_PI};
+//        arr_livox_cali_info[0] = {-0.16, -0.16, 0.737 - 0.0737, 0, 0, -0.75 * M_PI};
+//        arr_livox_cali_info[3] = {0.18, -0.18, 0.397 - 0.0397, 0, 0, -0.2417 * M_PI + 0.167 * M_PI};
+//        arr_livox_cali_info[4] = {0.18, -0.18, 0.397 - 0.0397, 0, 0, -0.2417 * M_PI};
+//        arr_livox_cali_info[5] = {0.18, -0.18, 0.397 - 0.0397, 0, 0, -0.2417 * M_PI - 0.167 * M_PI};
+//        arr_livox_cali_info[21] = {-0.16, 0.16, 0.737 - 0.0737, 0, 0, 0.75 * M_PI};
+//        arr_livox_cali_info[24] = {0.18, 0.18, 0.397 - 0.0397, 0, 0, 0.25 * M_PI + 0.167 * M_PI};
+//        arr_livox_cali_info[25] = {0.18, 0.18, 0.397 - 0.0397, 0, 0, 0.25 * M_PI};
+//        arr_livox_cali_info[26] = {0.18, 0.18, 0.397 - 0.0397, 0, 0, 0.25 * M_PI - 0.167 * M_PI};
+
+
+        arr_livox_cali_info[24] = {0.5, 0.29, 0, 0, 0, (43.0/180.0) * M_PI + 0.167 * M_PI};
+        arr_livox_cali_info[25] = {0.5, 0.29, 0, 0, 0, (43.0/180.0) * M_PI};
+        arr_livox_cali_info[26] = {0.5, 0.29, 0, 0, 0, (43.0/180.0) * M_PI - 0.167 * M_PI};
+        arr_livox_cali_info[18] = {0.5, -0.29, 0, 0, 0, (-45.0/180.0) * M_PI + 0.167 * M_PI};
+        arr_livox_cali_info[19] = {0.5, -0.29, 0, 0, 0, (-45.0/180.0) * M_PI};
+        arr_livox_cali_info[20] = {0.5, -0.29, 0, 0, 0, (-45.0/180.0) * M_PI - 0.167 * M_PI};
+        arr_livox_cali_info[21] = {-0.5, 0.29, 0, 0, 0, (132.0/180.0) * M_PI + 0.167 * M_PI};
+        arr_livox_cali_info[22] = {-0.5, 0.29, 0, 0, 0, (132.0/180.0) * M_PI};
+        arr_livox_cali_info[23] = {-0.5, 0.29, 0, 0, 0, (132.0/180.0) * M_PI - 0.167 * M_PI};
+        arr_livox_cali_info[0] = {-0.5, -0.29, 0, 0, 0, (-136.0/180.0) * M_PI + 0.167 * M_PI};
+        arr_livox_cali_info[1] = {-0.5, -0.29, 0, 0, 0, (-136.0/180.0) * M_PI};
+        arr_livox_cali_info[2] = {-0.5, -0.29, 0, 0, 0, (-136.0/180.0) * M_PI - 0.167 * M_PI};
 
         std::cout << "~~~~~ End ~~~~~" << endl;
     }
