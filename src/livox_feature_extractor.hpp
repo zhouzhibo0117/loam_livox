@@ -173,10 +173,10 @@ public:
 
     Livox_laser() {
         // Some data init
-        cout << "========= Hello, this is livox laser ========" << endl;
-        cout << "Compile time:  " << __TIME__ << endl;
-        cout << "Softward version: " << SOFT_WARE_VERSION << endl;
-        cout << "========= End ========" << endl;
+//        cout << "========= Hello, this is livox laser ========" << endl;
+//        cout << "Compile time:  " << __TIME__ << endl;
+//        cout << "Softward version: " << SOFT_WARE_VERSION << endl;
+//        cout << "========= End ========" << endl;
 
         m_max_edge_polar_pos = std::pow(tan(max_fov / 57.3) * 1, 2);
     }

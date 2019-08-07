@@ -68,10 +68,9 @@
 
 #include <ctime>
 
-#define PUB_SURROUND_PTS 1
-#define PUB_DEBUG_INFO 1
-
-int slover_type = 1; // if 0, using solver in laserFactor.hpp
+#define PUB_SURROUND_PTS 0
+#define PUB_DEBUG_INFO 0
+#define PUB_FULL_RES_PTS 1
 
 int g_if_undistore = 0;
 
@@ -81,9 +80,9 @@ int g_if_undistore = 0;
 #define ICP_PLANE 1
 #define ICP_LINE 1
 int MOTION_DEBLUR = 0;
-#define CUBE_W 100.0 // 10
-#define CUBE_H 100.0 // 10
-#define CUBE_D 50.0 // 5
+#define CUBE_W 50 // 10
+#define CUBE_H 50 // 10
+#define CUBE_D 25 // 5
 
 #define BLUR_SCALE 1.0
 
@@ -595,6 +594,11 @@ public:
             while (m_queue_avail_data.empty()) {
                 sleep(0.0001);
             }
+
+            // **************************************************************************************************************************************************************
+            // **************************************************************************************************************************************************************
+            clock_t timer=clock();
+
             m_mutex_buf.lock();
             while (m_queue_avail_data.size() >= (unsigned int) m_max_buffer_size) {
                 ROS_WARN("Drop lidar frame in mapping for real time performance !!!");
@@ -635,8 +639,8 @@ public:
             m_maximum_pt_time_stamp = max_t;
             m_last_time_stamp = max_t;
             reset_incremtal_parameter();
-            printf("****** min max timestamp = [%.6f, %.6f] ****** \r\n",
-                   m_minimum_pt_time_stamp, m_maximum_pt_time_stamp);
+//            printf("****** min max timestamp = [%.6f, %.6f] ****** \r\n",
+//                   m_minimum_pt_time_stamp, m_maximum_pt_time_stamp);
 
             // while ( !m_corner_last_que.empty() )
             // {
@@ -937,7 +941,12 @@ public:
             m_down_sample_filter_surface.filter(*laserCloudSurfStack);
             int laser_surface_pt_num = laserCloudSurfStack->points.size();
 
-            printf("map corner num %d  surf num %d \n", laserCloudCornerFromMapNum, laserCloudSurfFromMapNum);
+//            printf("map corner num %d  surf num %d \n", laserCloudCornerFromMapNum, laserCloudSurfFromMapNum);
+
+            // **************************************************************************************************************************************************************
+            // **************************************************************************************************************************************************************
+            std::cout << "[INFO] The running time ***************************** 0 is: " <<(double)(clock() - timer) / CLOCKS_PER_SEC << "s." << std::endl;
+            timer=clock();
 
             int surf_avail_num = 0;
             int corner_avail_num = 0;
@@ -957,6 +966,12 @@ public:
                 m_kdtree_corner_from_map->setInputCloud(m_laser_cloud_corner_from_map);
                 m_kdtree_surf_from_map->setInputCloud(m_laser_cloud_surf_from_map);
 
+                // **************************************************************************************************************************************************************
+                // **************************************************************************************************************************************************************
+                std::cout << "[INFO] The running time ***************************** 1 is: " <<(double)(clock() - timer) / CLOCKS_PER_SEC << "s." << std::endl;
+                timer=clock();
+                double time1=0,time2=0,time3=0,time4=0;
+
                 // for 循环迭代求解过程。
                 for (int iterCount = 0; iterCount < m_para_icp_max_iterations; iterCount++) {
                     corner_avail_num = 0;
@@ -973,6 +988,10 @@ public:
 
                     problem.AddParameterBlock(m_para_buffer_incremental, 4, q_parameterization);
                     problem.AddParameterBlock(m_para_buffer_incremental + 4, 3);
+
+                    // **************************************************************************************************************************************************************
+                    // **************************************************************************************************************************************************************
+                    timer=clock();
 
                     for (int i = 0; i < laser_corner_pt_num; i++) {
                         pointOri = laserCloudCornerStack->points[i];
@@ -1075,6 +1094,11 @@ public:
                         }
 
                     }
+
+                    // **************************************************************************************************************************************************************
+                    // **************************************************************************************************************************************************************
+                    time1+= ((double)(clock() - timer) / CLOCKS_PER_SEC);
+                    timer=clock();
 
                     for (int i = 0; i < laser_surface_pt_num; i++) {
                         //if ( laserCloudSurfStack->points[ i ].intensity < m_para_min_match_blur )
@@ -1184,6 +1208,11 @@ public:
                         }
                     }
 
+                    // **************************************************************************************************************************************************************
+                    // **************************************************************************************************************************************************************
+                    time2+= ((double)(clock() - timer) / CLOCKS_PER_SEC);
+                    timer=clock();
+
 
                     ceres::Solver::Options options;
 
@@ -1241,6 +1270,13 @@ public:
                         //*( m_file_logger.get_ostream() ) << "Inline blk size = " << residual_block_ids_bak.size() << endl;
                         residual_block_ids = residual_block_ids_bak;
                     }
+
+                    // **************************************************************************************************************************************************************
+                    // **************************************************************************************************************************************************************
+                    time3+= ((double)(clock() - timer) / CLOCKS_PER_SEC);
+                    timer=clock();
+
+
                     options.max_num_iterations = m_para_cere_max_iterations;
                     set_ceres_solver_bound(problem);
                     ceres::Solve(options, &problem, &summary);
@@ -1259,6 +1295,12 @@ public:
                     angular_diff = (float) m_q_w_curr.angularDistance(m_q_w_last) * 57.3;
                     t_diff = (m_t_w_curr - m_t_w_last).norm();
                     minimize_cost = summary.final_cost;
+
+
+                    // **************************************************************************************************************************************************************
+                    // **************************************************************************************************************************************************************
+                    time4+= ((double)(clock() - timer) / CLOCKS_PER_SEC);
+                    timer=clock();
                 }
 
                 printf("===== corner factor num %d , surf factor num %d=====\n", corner_avail_num, surf_avail_num);
@@ -1307,10 +1349,22 @@ public:
                     m_t_w_curr = m_t_w_last;
                     continue;
                 }
+
+                // **************************************************************************************************************************************************************
+                // **************************************************************************************************************************************************************
+                std::cout << "[INFO] The running time ******************* is: " <<time1<<'\t'<<time2<<'\t'<<time3<<'\t'<<time4<<'\t' << "s." << std::endl;
+
+
             } else {
                 ROS_WARN("time Map corner and surf num are not enough");
             }
 
+            // **************************************************************************************************************************************************************
+            // **************************************************************************************************************************************************************
+            std::cout << "[INFO] The running time ***************************** 2 is: " <<(double)(clock() - timer) / CLOCKS_PER_SEC << "s." << std::endl;
+            timer=clock();
+
+#if PUB_DEBUG_INFO
             if (PUB_DEBUG_INFO) {
                 pcl::PointCloud<PointType> pc_feature_pub_corners, pc_feature_pub_surface;
                 sensor_msgs::PointCloud2 laserCloudMsg;
@@ -1326,6 +1380,7 @@ public:
                 laserCloudMsg.header.frame_id = "/camera_init";
                 m_pub_last_corner_pts.publish(laserCloudMsg);
             }
+#endif
 
             for (int i = 0; i < laser_corner_pt_num; i++) {
                 //if ( MOTION_DEBLUR && ( laserCloudSurfStack->points[ i ].intensity < m_para_min_match_blur ) )
@@ -1444,27 +1499,29 @@ public:
                 }
             }
 
-            int laserCloudFullResNum = m_laser_cloud_full_res->points.size();
+            if(PUB_FULL_RES_PTS) {
+                pcl::PointCloud<PointType>::Ptr laserCloudMapFiltered(new pcl::PointCloud<PointType>());
+                m_down_sample_filter_map.setInputCloud(m_laser_cloud_full_res);
+                m_down_sample_filter_map.filter(*laserCloudMapFiltered);
 
-            for (int i = 0; i < laserCloudFullResNum; i++) {
-                //pointAssociateToMap( &m_laser_cloud_full_res->points[ i ], &m_laser_cloud_full_res->points[ i ],refine_blur( m_laser_cloud_full_res->points[ i ].intensity, m_min_blurs_s, m_max_blurs_s) , g_if_undistore  );
-                pointAssociateToMap(&m_laser_cloud_full_res->points[i], &m_laser_cloud_full_res->points[i],
-                                    refine_blur(m_laser_cloud_full_res->points[i].intensity, m_minimum_pt_time_stamp,
-                                                m_maximum_pt_time_stamp), 1);
-            }
+                int laserCloudFullResNum = laserCloudMapFiltered->points.size();
 
-            pcl::PointCloud<PointType>::Ptr laserCloudMapFiltered(new pcl::PointCloud<PointType>());
-            m_down_sample_filter_map.setInputCloud(m_laser_cloud_full_res);
-            m_down_sample_filter_map.filter(*laserCloudMapFiltered);
+                for (int i = 0; i < laserCloudFullResNum; i++) {
+                    //pointAssociateToMap( &laserCloudMapFiltered->points[ i ], &laserCloudMapFiltered->points[ i ],refine_blur( laserCloudMapFiltered->points[ i ].intensity, m_min_blurs_s, m_max_blurs_s) , g_if_undistore  );
+                    pointAssociateToMap(&laserCloudMapFiltered->points[i], &laserCloudMapFiltered->points[i],
+                                        refine_blur(laserCloudMapFiltered->points[i].intensity, m_minimum_pt_time_stamp,
+                                                    m_maximum_pt_time_stamp), 1);
+                }
 
-            sensor_msgs::PointCloud2 laserCloudFullRes3;
-            pcl::toROSMsg(*laserCloudMapFiltered, laserCloudFullRes3);
-            laserCloudFullRes3.header.stamp = ros::Time().fromSec(m_time_odom);
-            laserCloudFullRes3.header.frame_id = "/camera_init";
-            m_pub_laser_cloud_full_res.publish(laserCloudFullRes3); //single_frame_with_pose_tranfromed
+                sensor_msgs::PointCloud2 laserCloudFullRes3;
+                pcl::toROSMsg(*laserCloudMapFiltered, laserCloudFullRes3);
+                laserCloudFullRes3.header.stamp = ros::Time().fromSec(m_time_odom);
+                laserCloudFullRes3.header.frame_id = "/camera_init";
+                m_pub_laser_cloud_full_res.publish(laserCloudFullRes3); //single_frame_with_pose_tranfromed
 
-            if (m_if_save_to_pcd_files) {
-                m_pcl_tools.save_to_pcd_files("scan", *m_laser_cloud_full_res, 1);
+                if (m_if_save_to_pcd_files) {
+                    m_pcl_tools.save_to_pcd_files("scan", *m_laser_cloud_full_res, 1);
+                }
             }
 
             nav_msgs::Odometry odomAftMapped;

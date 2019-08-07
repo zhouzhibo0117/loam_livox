@@ -35,7 +35,6 @@
      <remap from="/laser_points" to="/livox/hub" />
     </node>
 
-
     <node pkg="loam_livox" type="livox_laserMapping" name="livox_laserMapping" output="screen" />
 
     <!--<node pkg="rosbag" type="play" name="rosbag" args="-r 1.0 $(env HOME)/data/rosbag/CYT_02.bag"/>-->

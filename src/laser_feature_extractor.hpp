@@ -315,9 +315,6 @@ public:
                 float raw_intensity = laserCloudInAll[iter]->points[0].intensity;
                 int livox_id = round((raw_intensity - float(int(raw_intensity))) * 1000);
 
-                // if(livox_id!=3)
-                // continue;
-
                 TransfromToLivoxCoordinate(laserCloudInAll[iter],
                                            arr_livox_cali_info[livox_id].x,
                                            arr_livox_cali_info[livox_id].y,
