@@ -403,28 +403,38 @@ public:
 
                     int start_idx = 0;
                     int end_idx = laserCloudScans[end_scans].size() - 1;
+
+                    if(end_idx<1) continue;
+
                     piece_wise_start[i] =
                             ((float) m_livox.find_pt_info(
                                     laserCloudScans[start_scans].points[start_idx])->idx) /
-                            m_livox.m_pts_info_vec.size();
+                                    (m_livox.m_pts_info_vec.size() +0.001);
+
                     // printf( "Max scan number = %d, start = %d, end  = %d, %d \r\n", m_laser_scan_number, start_scans, end_scans, end_idx );
                     // cout << "Start pt: " << laserCloudScans[ start_scans ].points[ 0 ] << endl;
                     // cout << "End pt: " << laserCloudScans[ end_scans ].points[ end_idx ] << endl;
                     piece_wise_end[i] =
                             ((float) m_livox.find_pt_info(laserCloudScans[end_scans].points[end_idx])->idx) /
-                            m_livox.m_pts_info_vec.size();
-                }
-
-                for (int i = 0; i < piece_wise; i++) {
-
+                                    (m_livox.m_pts_info_vec.size()+0.001);
 
                     m_livox.get_features(*livox_corners_all[iter],
                                          *livox_surface_all[iter],
                                          *livox_full_all[iter],
                                          piece_wise_start[i],
                                          piece_wise_end[i]);
-
                 }
+
+//                for (int i = 0; i < piece_wise; i++) {
+//
+//
+//                    m_livox.get_features(*livox_corners_all[iter],
+//                                         *livox_surface_all[iter],
+//                                         *livox_full_all[iter],
+//                                         piece_wise_start[i],
+//                                         piece_wise_end[i]);
+//
+//                }
             }
 
 
@@ -469,21 +479,27 @@ public:
             ros::Time current_time = ros::Time::now();
 
             pcl::toROSMsg(*livox_full, temp_out_msg);
-            temp_out_msg.header.stamp = current_time;
+            temp_out_msg.header.stamp = ros::Time().fromSec(timestamp);
             temp_out_msg.header.frame_id = "/camera_init";
             m_pub_pc_livox_full.publish(temp_out_msg);
 
+            pcl::PointCloud<PointType>::Ptr tmpSurface(new pcl::PointCloud<PointType>());
             m_voxel_filter_for_surface.setInputCloud(livox_surface);
-            m_voxel_filter_for_surface.filter(*livox_surface);
+            m_voxel_filter_for_surface.filter(*tmpSurface);
+            livox_surface->clear();
+            livox_surface=tmpSurface;
             pcl::toROSMsg(*livox_surface, temp_out_msg);
-            temp_out_msg.header.stamp = current_time;
+            temp_out_msg.header.stamp = ros::Time().fromSec(timestamp);
             temp_out_msg.header.frame_id = "/camera_init";
             m_pub_pc_livox_surface.publish(temp_out_msg);
 
+            pcl::PointCloud<PointType>::Ptr tmpCorner(new pcl::PointCloud<PointType>());
             m_voxel_filter_for_corner.setInputCloud(livox_corners);
-            m_voxel_filter_for_corner.filter(*livox_corners);
+            m_voxel_filter_for_corner.filter(*tmpCorner);
+            livox_corners->clear();
+            livox_corners=tmpCorner;
             pcl::toROSMsg(*livox_corners, temp_out_msg);
-            temp_out_msg.header.stamp = current_time;
+            temp_out_msg.header.stamp = ros::Time().fromSec(timestamp);
             temp_out_msg.header.frame_id = "/camera_init";
             m_pub_pc_livox_corners.publish(temp_out_msg);
         }

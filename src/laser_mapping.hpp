@@ -68,7 +68,7 @@
 
 #include <ctime>
 
-#define PUB_SURROUND_PTS 0
+#define PUB_SURROUND_PTS 1
 #define PUB_DEBUG_INFO 0
 #define PUB_FULL_RES_PTS 1
 
@@ -90,6 +90,8 @@ int line_search_num = 5;
 int IF_LINE_FEATURE_CHECK = 1;
 int plane_search_num = 5;
 int IF_PLANE_FEATURE_CHECK = 0;
+
+std::ofstream outFile_odom;
 
 using namespace PCL_TOOLS;
 using namespace Common_tools;
@@ -288,9 +290,19 @@ public:
         m_pub_laser_aft_mapped_path = m_ros_node_handle.advertise<nav_msgs::Path>("/aft_mapped_path", 10000);
 
         cout << "Laser_mapping init OK" << endl;
+
+        std::string gtfile_string ("/home/localization/Desktop/odom.txt");
+        char buf[500];
+        strcpy(buf, gtfile_string.c_str());
+        outFile_odom.open(buf);
+
+        m_q_w_curr.x()=0;m_q_w_curr.y()=0;m_q_w_curr.z()=0;m_q_w_curr.w()=1;
+        m_t_w_curr.x()=0;m_t_w_curr.y()=0;m_t_w_curr.z()=0;
     };
 
-    ~Laser_mapping() {};
+    ~Laser_mapping() {
+//        outFile_odom.close();
+    };
 
     void compute_interpolatation_rodrigue(const Eigen::Quaterniond &q_in,
                                           Eigen::Matrix<double, 3, 1> &angle_axis,
@@ -357,7 +369,7 @@ public:
         m_file_logger.printf("line resolution %f plane resolution %f \n", lineRes, planeRes);
         m_down_sample_filter_corner.setLeafSize(lineRes, lineRes, lineRes);
         m_down_sample_filter_surface.setLeafSize(planeRes, planeRes, planeRes);
-        m_down_sample_filter_map.setLeafSize(0.5, 0.5, 0.5);
+        m_down_sample_filter_map.setLeafSize(0.1, 0.1, 0.1);
 
         m_filter_k_means.setMeanK(m_kmean_filter_count);
         m_filter_k_means.setStddevMulThresh(m_kmean_filter_threshold);
@@ -968,7 +980,7 @@ public:
 
                 // **************************************************************************************************************************************************************
                 // **************************************************************************************************************************************************************
-                std::cout << "[INFO] The running time ***************************** 1 is: " <<(double)(clock() - timer) / CLOCKS_PER_SEC << "s." << std::endl;
+                std::cout << "[INFO] The running time ***************************** 1 is: " <<(double)(clock() - timer) / CLOCKS_PER_SEC *1000 << "ms." << std::endl;
                 timer=clock();
                 double time1=0,time2=0,time3=0,time4=0;
 
@@ -1361,7 +1373,7 @@ public:
 
             // **************************************************************************************************************************************************************
             // **************************************************************************************************************************************************************
-            std::cout << "[INFO] The running time ***************************** 2 is: " <<(double)(clock() - timer) / CLOCKS_PER_SEC << "s." << std::endl;
+            std::cout << "[INFO] The running time ***************************** 2 is: " <<(double)(clock() - timer) / CLOCKS_PER_SEC *1000<< "ms." << std::endl;
             timer=clock();
 
 #if PUB_DEBUG_INFO
@@ -1450,6 +1462,7 @@ public:
                 // m_down_sample_filter_corner.setInputCloud( tmpCorner );
                 m_down_sample_filter_corner.setInputCloud(m_laser_cloud_corner_array[ind]);
                 m_down_sample_filter_corner.filter(*tmpCorner);
+                m_laser_cloud_corner_array[ind]->clear();
                 m_laser_cloud_corner_array[ind] = tmpCorner;
 
                 pcl::PointCloud<PointType>::Ptr tmpSurf(new pcl::PointCloud<PointType>());
@@ -1458,6 +1471,7 @@ public:
                 // m_down_sample_filter_surface.setInputCloud(tmpSurf );
                 m_down_sample_filter_surface.setInputCloud(m_laser_cloud_surface_array[ind]);
                 m_down_sample_filter_surface.filter(*tmpSurf);
+                m_laser_cloud_surface_array[ind]->clear();
                 m_laser_cloud_surface_array[ind] = tmpSurf;
             }
 
@@ -1515,7 +1529,8 @@ public:
 
                 sensor_msgs::PointCloud2 laserCloudFullRes3;
                 pcl::toROSMsg(*laserCloudMapFiltered, laserCloudFullRes3);
-                laserCloudFullRes3.header.stamp = ros::Time().fromSec(m_time_odom);
+//                laserCloudFullRes3.header.stamp = ros::Time().fromSec(m_time_odom);
+                laserCloudFullRes3.header.stamp = ros::Time().fromSec(m_time_pc_corner_past);
                 laserCloudFullRes3.header.frame_id = "/camera_init";
                 m_pub_laser_cloud_full_res.publish(laserCloudFullRes3); //single_frame_with_pose_tranfromed
 
@@ -1523,6 +1538,17 @@ public:
                     m_pcl_tools.save_to_pcd_files("scan", *m_laser_cloud_full_res, 1);
                 }
             }
+
+            tf::Quaternion quat;
+            double roll,pitch,yaw;
+            quat.setX(m_q_w_curr.x());
+            quat.setY(m_q_w_curr.y());
+            quat.setZ(m_q_w_curr.z());
+            quat.setW(m_q_w_curr.w());
+            tf::Matrix3x3(quat).getRPY(roll,pitch,yaw);
+
+            outFile_odom << std::fixed << std::setprecision(4) << m_time_pc_corner_past << '\t' << m_t_w_curr.x()<< '\t' << m_t_w_curr.y() << '\t' << m_t_w_curr.z() << '\t' << roll << '\t' << pitch << '\t' << yaw << std::endl;
+
 
             nav_msgs::Odometry odomAftMapped;
             odomAftMapped.header.frame_id = "/camera_init";
@@ -1581,7 +1607,7 @@ public:
             frameCount++;
 
             endTime = clock();//计时结束
-            std::cout << "[INFO] The running time of frame matching is: " <<(double)(endTime - startTime) / CLOCKS_PER_SEC << "s." << std::endl;
+            std::cout << "[INFO] The running time of frame matching is: " <<(double)(endTime - startTime) / CLOCKS_PER_SEC *1000<< "ms." << std::endl;
         }
         std::chrono::nanoseconds dura(1);
         std::this_thread::sleep_for(dura);

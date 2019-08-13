@@ -271,7 +271,9 @@ public:
                 break;
             case (e_I_motion_blur):
                 pt.intensity = ((float) pt_info->idx) / (float) m_input_points_size;
-                assert(pt.intensity <= 1.0 && pt.intensity >= 0.0);
+//                assert(pt.intensity <= 1.0 && pt.intensity >= 0.0);
+                if (pt.intensity <= 0.9999) pt.intensity = 0.9999;
+                if (pt.intensity >= 0.0001) pt.intensity = 0.0001;
                 break;
             case (e_I_motion_mix):
                 pt.intensity =
@@ -682,7 +684,7 @@ public:
                 if ((pts_mask[i][idx] & remove_point_pt_type) == 0)
                     //if(pts_mask[i][idx] == e_normal )
                 {
-                    if (laserCloudScans[i].points[idx].x == 0) {
+                    if ( laserCloudScans[i].points[idx].x == 0) {
                         printf("Error!!! Mask = %d\r\n", pts_mask[i][idx]);
                         assert(laserCloudScans[i].points[idx].x != 0);
                         continue;

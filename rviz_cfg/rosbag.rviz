@@ -10,6 +10,7 @@ Panels:
         - /odometry1/odomPath1
         - /odometry1/PointCloud21
         - /mapping1
+        - /mapping1/surround1
         - /mapping1/currPoints1
         - /Debug1/PointCloud21
         - /Debug1/PointCloud22
@@ -243,16 +244,16 @@ Visualization Manager:
         - Alpha: 1
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
-            Max Value: 10
-            Min Value: -10
+            Max Value: 26.2531872
+            Min Value: -2.44099998
             Value: true
           Axis: Z
           Channel Name: intensity
           Class: rviz/PointCloud2
           Color: 255; 255; 255
-          Color Transformer: FlatColor
-          Decay Time: 0.200000003
-          Enabled: false
+          Color Transformer: AxisColor
+          Decay Time: 0
+          Enabled: true
           Invert Rainbow: false
           Max Color: 255; 255; 255
           Max Intensity: 15
@@ -263,25 +264,25 @@ Visualization Manager:
           Queue Size: 1
           Selectable: false
           Size (Pixels): 1
-          Size (m): 0.0500000007
-          Style: Points
+          Size (m): 0.0799999982
+          Style: Flat Squares
           Topic: /laser_cloud_surround
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true
-          Value: false
-        - Alpha: 0.5
+          Value: true
+        - Alpha: 1
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
-            Max Value: 19.0470009
-            Min Value: -66.3509979
+            Max Value: 34.0370331
+            Min Value: -63.4491234
             Value: true
           Axis: Z
           Channel Name: intensity
           Class: rviz/PointCloud2
           Color: 255; 255; 255
-          Color Transformer: AxisColor
-          Decay Time: 1000
+          Color Transformer: FlatColor
+          Decay Time: 0
           Enabled: true
           Invert Rainbow: true
           Max Color: 255; 255; 255
@@ -578,7 +579,7 @@ Visualization Manager:
       Color: 255; 255; 255
       Color Transformer: FlatColor
       Decay Time: 0
-      Enabled: true
+      Enabled: false
       Invert Rainbow: false
       Max Color: 255; 255; 255
       Max Intensity: 0.276897073
@@ -595,7 +596,7 @@ Visualization Manager:
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
-      Value: true
+      Value: false
     - Class: rviz/Group
       Displays:
         - Alpha: 1
@@ -685,7 +686,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/ThirdPersonFollower
-      Distance: 57.1000214
+      Distance: 52.9913292
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.0599999987
         Stereo Focal Distance: 1
@@ -700,10 +701,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.00999999978
-      Pitch: 1.30479658
+      Pitch: 1.52479637
       Target Frame: body
       Value: ThirdPersonFollower (rviz)
-      Yaw: 4.46540785
+      Yaw: 4.57043314
     Saved: ~
 Window Geometry:
   Displays:
