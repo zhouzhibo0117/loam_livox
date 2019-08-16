@@ -47,7 +47,10 @@
 #include <pcl_conversions/pcl_conversions.h>
 #include <ros/ros.h>
 #include <sensor_msgs/Imu.h>
+#include <sensor_msgs/NavSatFix.h>
 #include <sensor_msgs/PointCloud2.h>
+#include <geometry_msgs/PoseStamped.h>
+#include <std_msgs/Bool.h>
 #include <string>
 #include <tf/transform_broadcaster.h>
 #include <tf/transform_datatypes.h>
@@ -71,7 +74,7 @@ public:
 
     int m_if_pub_debug_feature = 1; // TODO: ???
 
-    const int m_para_system_delay = 2;
+    const int m_para_system_delay = 20;
     int m_para_system_init_count = 0;
     bool m_para_systemInited = false;
     float m_pc_curvature[400000];
@@ -128,6 +131,16 @@ public:
     CalibrationInfo arr_livox_cali_info[LIVOX_NUM_MAX];
     std::vector<int> livox_id_index_vec;
 
+    // GPS & IMU info.
+    double gps_x_;
+    double gps_y_;
+    double gps_phi_;
+    geometry_msgs::PoseStamped gps_msg_;
+    ros::Publisher pub_gps_msgs_;
+    ros::Subscriber sub_gps_msgs_;
+    ros::Subscriber sub_cmd_msgs_;
+    bool is_gps_available_;
+
     int init_ros_env() {
         ros::NodeHandle nh;
         m_init_timestamp = ros::Time::now();
@@ -170,6 +183,12 @@ public:
         m_pub_pc_livox_corners = nh.advertise<sensor_msgs::PointCloud2>("/pc2_corners", 10000);
         m_pub_pc_livox_surface = nh.advertise<sensor_msgs::PointCloud2>("/pc2_surface", 10000);
         m_pub_pc_livox_full = nh.advertise<sensor_msgs::PointCloud2>("/pc2_full", 10000);
+
+        pub_gps_msgs_ = nh.advertise<geometry_msgs::PoseStamped>("/pc2_gps_msgs", 10000);
+        sub_gps_msgs_ = nh.subscribe<geometry_msgs::PoseStamped>("/gps_topic_name", 10000,
+                                                                 &Laser_feature::vehiclePoseHandler, this);
+        sub_cmd_msgs_ = nh.subscribe<std_msgs::Bool>("/cmd_topic_name", 10000,
+                                                                 &Laser_feature::commandHandler, this);
 
         m_voxel_filter_for_surface.setLeafSize(m_plane_resolution / 2, m_plane_resolution / 2, m_plane_resolution / 2);
         m_voxel_filter_for_corner.setLeafSize(m_line_resolution, m_line_resolution, m_line_resolution);
@@ -253,6 +272,16 @@ public:
 
     }
 
+    void commandHandler(const std_msgs::BoolConstPtr &cmdMsg)
+    {
+        is_gps_available_ = cmdMsg->data;
+    }
+
+    void vehiclePoseHandler(const geometry_msgs::PoseStampedConstPtr &poseMsg)
+    {
+        gps_msg_ = *poseMsg;
+    }
+
     // Lidar数据的回调函数，处理单帧lidar数据。
     void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg) {
 
@@ -268,6 +297,15 @@ public:
             } else
                 return;
         }
+
+        if (is_gps_available_)
+        {
+            ROS_INFO_STREAM("GPS Mode.");
+            geometry_msgs::PoseStamped out_gps_msg;
+            out_gps_msg = gps_msg_;
+            out_gps_msg.header.stamp = laserCloudMsg->header.stamp; // 寻找最近的时间戳
+            pub_gps_msgs_.publish(out_gps_msg);
+        }else{
 
 
         for (int i = 0; i < LIVOX_NUM_MAX; ++i) {
@@ -505,7 +543,7 @@ public:
         }
 
 
-//        }
+       }
     }
 
     void init_livox_lidar_para() {
@@ -577,6 +615,11 @@ public:
         arr_livox_cali_info[0] = {-0.5, -0.29, 0, 0, 0, (-136.0/180.0) * M_PI + 0.167 * M_PI};
         arr_livox_cali_info[1] = {-0.5, -0.29, 0, 0, 0, (-136.0/180.0) * M_PI};
         arr_livox_cali_info[2] = {-0.5, -0.29, 0, 0, 0, (-136.0/180.0) * M_PI - 0.167 * M_PI};
+
+        is_gps_available_ = true;
+        gps_x_ = 0;
+        gps_y_ = 0;
+        gps_phi_ = 0;
 
         std::cout << "~~~~~ End ~~~~~" << endl;
     }

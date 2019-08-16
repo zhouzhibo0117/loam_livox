@@ -40,6 +40,7 @@
 #include <ceres/ceres.h>
 #include <eigen3/Eigen/Dense>
 #include <geometry_msgs/PoseStamped.h>
+#include <std_msgs/Bool.h>
 #include <iostream>
 #include <math.h>
 #include <mutex>
@@ -157,6 +158,12 @@ public:
     float m_minimum_pt_time_stamp = 0;
     float m_maximum_pt_time_stamp = 1.0;
     float m_last_max_blur = 0.0;
+
+    // GPS IMU msgs;
+    double out_odom_timestamp_;
+    bool is_gps_available_;
+    ros::Subscriber sub_gps_msgs_;
+    ros::Subscriber sub_cmd_msgs_;
 
     double m_interpolatation_theta;
     Eigen::Matrix<double, 3, 1> m_interpolatation_omega;
@@ -291,6 +298,11 @@ public:
 
         cout << "Laser_mapping init OK" << endl;
 
+        sub_gps_msgs_ = m_ros_node_handle.subscribe<geometry_msgs::PoseStamped>("/pc2_gps_msgs", 10000,
+                                                                 &Laser_mapping::vehiclePoseHandler, this);
+        sub_cmd_msgs_ = m_ros_node_handle.subscribe<std_msgs::Bool>("/cmd_topic_name", 10000,
+                                                     &Laser_mapping::commandHandler, this);
+
         std::string gtfile_string ("/home/localization/Desktop/odom.txt");
         char buf[500];
         strcpy(buf, gtfile_string.c_str());
@@ -298,6 +310,8 @@ public:
 
         m_q_w_curr.x()=0;m_q_w_curr.y()=0;m_q_w_curr.z()=0;m_q_w_curr.w()=1;
         m_t_w_curr.x()=0;m_t_w_curr.y()=0;m_t_w_curr.z()=0;
+
+        is_gps_available_ = true;
     };
 
     ~Laser_mapping() {
@@ -520,6 +534,36 @@ public:
         return Eigen::Matrix<double, 3, 1>(pt.x, pt.y, pt.z);
     }
 
+
+    void commandHandler(const std_msgs::BoolConstPtr &cmdMsg)
+    {
+        is_gps_available_ = cmdMsg->data;
+    }
+
+    void vehiclePoseHandler(const geometry_msgs::PoseStampedConstPtr &poseMsg)
+    {
+        out_odom_timestamp_ = poseMsg->header.stamp.toSec();
+        m_t_w_curr.x() = poseMsg->pose.position.x;
+        m_t_w_curr.y() = poseMsg->pose.position.y;
+        m_t_w_curr.z() = poseMsg->pose.position.z;
+
+        m_q_w_curr.x() = poseMsg->pose.orientation.x;
+        m_q_w_curr.y() = poseMsg->pose.orientation.y;
+        m_q_w_curr.z() = poseMsg->pose.orientation.z;
+        m_q_w_curr.w() = poseMsg->pose.orientation.w;
+
+        tf::Quaternion quat;
+        double roll, pitch, yaw;
+        quat.setX(m_q_w_curr.x());
+        quat.setY(m_q_w_curr.y());
+        quat.setZ(m_q_w_curr.z());
+        quat.setW(m_q_w_curr.w());
+        tf::Matrix3x3(quat).getRPY(roll, pitch, yaw);
+
+        if (is_gps_available_)
+            outFile_odom << std::fixed << std::setprecision(4) << out_odom_timestamp_ << '\t' << m_t_w_curr.x() << '\t' << m_t_w_curr.y() << '\t' << m_t_w_curr.z() << '\t' << roll << '\t' << pitch << '\t' << yaw << std::endl;
+    }
+
     // Receive odometry info.
     void laserOdometryHandler(const nav_msgs::Odometry::ConstPtr &laserOdometry) {
         m_mutex_buf.lock();
@@ -602,6 +646,9 @@ public:
 
             m_file_logger.printf("------------------\r\n");
 
+
+            if(!is_gps_available_){
+
             // 获取最新数据帧。
             while (m_queue_avail_data.empty()) {
                 sleep(0.0001);
@@ -625,6 +672,7 @@ public:
             startTime=clock();
 
             m_time_pc_corner_past = current_data_pair->m_pc_corner->header.stamp.toSec();
+            out_odom_timestamp_ = m_time_pc_corner_past;
 
             if (first_time_stamp < 0) {
                 first_time_stamp = m_time_pc_corner_past;
@@ -1547,7 +1595,7 @@ public:
             quat.setW(m_q_w_curr.w());
             tf::Matrix3x3(quat).getRPY(roll,pitch,yaw);
 
-            outFile_odom << std::fixed << std::setprecision(4) << m_time_pc_corner_past << '\t' << m_t_w_curr.x()<< '\t' << m_t_w_curr.y() << '\t' << m_t_w_curr.z() << '\t' << roll << '\t' << pitch << '\t' << yaw << std::endl;
+            outFile_odom << std::fixed << std::setprecision(4) << out_odom_timestamp_ << '\t' << m_t_w_curr.x()<< '\t' << m_t_w_curr.y() << '\t' << m_t_w_curr.z() << '\t' << roll << '\t' << pitch << '\t' << yaw << std::endl;
 
 
             nav_msgs::Odometry odomAftMapped;
@@ -1608,6 +1656,9 @@ public:
 
             endTime = clock();//计时结束
             std::cout << "[INFO] The running time of frame matching is: " <<(double)(endTime - startTime) / CLOCKS_PER_SEC *1000<< "ms." << std::endl;
+            }
+        
+        
         }
         std::chrono::nanoseconds dura(1);
         std::this_thread::sleep_for(dura);
