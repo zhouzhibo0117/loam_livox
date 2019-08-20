@@ -162,8 +162,10 @@ public:
     // GPS IMU msgs;
     double out_odom_timestamp_;
     bool is_gps_available_;
+    bool slam_init_flag_;
     ros::Subscriber sub_gps_msgs_;
     ros::Subscriber sub_cmd_msgs_;
+    double lidar_to_vehicle_x_;// 标定。
 
     double m_interpolatation_theta;
     Eigen::Matrix<double, 3, 1> m_interpolatation_omega;
@@ -303,7 +305,7 @@ public:
         sub_cmd_msgs_ = m_ros_node_handle.subscribe<std_msgs::Bool>("/cmd_topic_name", 10000,
                                                      &Laser_mapping::commandHandler, this);
 
-        std::string gtfile_string ("/home/localization/Desktop/odom.txt");
+        std::string gtfile_string ("/home/wuling/Desktop/odom_0820.txt");
         char buf[500];
         strcpy(buf, gtfile_string.c_str());
         outFile_odom.open(buf);
@@ -311,7 +313,9 @@ public:
         m_q_w_curr.x()=0;m_q_w_curr.y()=0;m_q_w_curr.z()=0;m_q_w_curr.w()=1;
         m_t_w_curr.x()=0;m_t_w_curr.y()=0;m_t_w_curr.z()=0;
 
-        is_gps_available_ = true;
+        is_gps_available_ = false;
+        slam_init_flag_ = false;
+        lidar_to_vehicle_x_ = -0.5;
     };
 
     ~Laser_mapping() {
@@ -542,26 +546,51 @@ public:
 
     void vehiclePoseHandler(const geometry_msgs::PoseStampedConstPtr &poseMsg)
     {
-        out_odom_timestamp_ = poseMsg->header.stamp.toSec();
-        m_t_w_curr.x() = poseMsg->pose.position.x;
-        m_t_w_curr.y() = poseMsg->pose.position.y;
-        m_t_w_curr.z() = poseMsg->pose.position.z;
-
-        m_q_w_curr.x() = poseMsg->pose.orientation.x;
-        m_q_w_curr.y() = poseMsg->pose.orientation.y;
-        m_q_w_curr.z() = poseMsg->pose.orientation.z;
-        m_q_w_curr.w() = poseMsg->pose.orientation.w;
-
-        tf::Quaternion quat;
-        double roll, pitch, yaw;
-        quat.setX(m_q_w_curr.x());
-        quat.setY(m_q_w_curr.y());
-        quat.setZ(m_q_w_curr.z());
-        quat.setW(m_q_w_curr.w());
-        tf::Matrix3x3(quat).getRPY(roll, pitch, yaw);
-
         if (is_gps_available_)
+        {
+            out_odom_timestamp_ = poseMsg->header.stamp.toSec();
+            m_t_w_curr.x() = poseMsg->pose.position.x;
+            m_t_w_curr.y() = poseMsg->pose.position.y;
+            m_t_w_curr.z() = poseMsg->pose.position.z;
+
+            m_q_w_curr.x() = poseMsg->pose.orientation.x;
+            m_q_w_curr.y() = poseMsg->pose.orientation.y;
+            m_q_w_curr.z() = poseMsg->pose.orientation.z;
+            m_q_w_curr.w() = poseMsg->pose.orientation.w;
+
+            tf::Quaternion quat;
+            double roll, pitch, yaw;
+            quat.setX(m_q_w_curr.x());
+            quat.setY(m_q_w_curr.y());
+            quat.setZ(m_q_w_curr.z());
+            quat.setW(m_q_w_curr.w());
+            tf::Matrix3x3(quat).getRPY(roll, pitch, yaw);
+
             outFile_odom << std::fixed << std::setprecision(4) << out_odom_timestamp_ << '\t' << m_t_w_curr.x() << '\t' << m_t_w_curr.y() << '\t' << m_t_w_curr.z() << '\t' << roll << '\t' << pitch << '\t' << yaw << std::endl;
+        }
+
+        if (!slam_init_flag_)
+        {
+            m_q_w_curr.x() = poseMsg->pose.orientation.x;
+            m_q_w_curr.y() = poseMsg->pose.orientation.y;
+            m_q_w_curr.z() = poseMsg->pose.orientation.z;
+            m_q_w_curr.w() = poseMsg->pose.orientation.w;
+
+            tf::Quaternion quat;
+            double roll, pitch, yaw;
+            quat.setX(m_q_w_curr.x());
+            quat.setY(m_q_w_curr.y());
+            quat.setZ(m_q_w_curr.z());
+            quat.setW(m_q_w_curr.w());
+            tf::Matrix3x3(quat).getRPY(roll, pitch, yaw);
+
+            m_t_w_curr.x() = poseMsg->pose.position.x+lidar_to_vehicle_x_*cos(yaw);
+            m_t_w_curr.y() = poseMsg->pose.position.y+lidar_to_vehicle_x_*sin(yaw);
+            m_t_w_curr.z() = poseMsg->pose.position.z;
+
+            slam_init_flag_ = true;
+            ROS_INFO_STREAM("SLAM Initialization finished.");
+        }
     }
 
     // Receive odometry info.
@@ -647,7 +676,8 @@ public:
             m_file_logger.printf("------------------\r\n");
 
 
-            if(!is_gps_available_){
+            if(!is_gps_available_ && slam_init_flag_){
+
 
             // 获取最新数据帧。
             while (m_queue_avail_data.empty()) {
@@ -1595,7 +1625,13 @@ public:
             quat.setW(m_q_w_curr.w());
             tf::Matrix3x3(quat).getRPY(roll,pitch,yaw);
 
-            outFile_odom << std::fixed << std::setprecision(4) << out_odom_timestamp_ << '\t' << m_t_w_curr.x()<< '\t' << m_t_w_curr.y() << '\t' << m_t_w_curr.z() << '\t' << roll << '\t' << pitch << '\t' << yaw << std::endl;
+            outFile_odom << std::fixed << std::setprecision(4) << out_odom_timestamp_ << '\t' << m_t_w_curr.x() - lidar_to_vehicle_x_*cos(yaw)
+                                                                                    << '\t' << m_t_w_curr.y() - lidar_to_vehicle_x_*sin(yaw)
+                                                                                    << '\t' << m_t_w_curr.z()
+                                                                                             << '\t' << roll 
+                                                                                        << '\t' << pitch 
+                                                                                         << '\t' << yaw 
+                                                                                         << std::endl;
 
 
             nav_msgs::Odometry odomAftMapped;

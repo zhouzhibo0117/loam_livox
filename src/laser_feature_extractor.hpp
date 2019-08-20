@@ -140,6 +140,7 @@ public:
     ros::Subscriber sub_gps_msgs_;
     ros::Subscriber sub_cmd_msgs_;
     bool is_gps_available_;
+    unsigned dropout_count_;
 
     int init_ros_env() {
         ros::NodeHandle nh;
@@ -185,7 +186,7 @@ public:
         m_pub_pc_livox_full = nh.advertise<sensor_msgs::PointCloud2>("/pc2_full", 10000);
 
         pub_gps_msgs_ = nh.advertise<geometry_msgs::PoseStamped>("/pc2_gps_msgs", 10000);
-        sub_gps_msgs_ = nh.subscribe<geometry_msgs::PoseStamped>("/gps_topic_name", 10000,
+        sub_gps_msgs_ = nh.subscribe<geometry_msgs::PoseStamped>("/vehicle_global_pose", 10000,
                                                                  &Laser_feature::vehiclePoseHandler, this);
         sub_cmd_msgs_ = nh.subscribe<std_msgs::Bool>("/cmd_topic_name", 10000,
                                                                  &Laser_feature::commandHandler, this);
@@ -280,6 +281,14 @@ public:
     void vehiclePoseHandler(const geometry_msgs::PoseStampedConstPtr &poseMsg)
     {
         gps_msg_ = *poseMsg;
+
+        if(!is_gps_available_){
+            geometry_msgs::PoseStamped out_gps_msg;
+            out_gps_msg = gps_msg_;
+            out_gps_msg.header.stamp = poseMsg->header.stamp; // 寻找最近的时间戳
+            pub_gps_msgs_.publish(out_gps_msg);
+
+        }
     }
 
     // Lidar数据的回调函数，处理单帧lidar数据。
@@ -300,12 +309,20 @@ public:
 
         if (is_gps_available_)
         {
+            dropout_count_++;
+            if(dropout_count_%2 !=0){
+                std::cout<<" Dropout! \n";
+                return;
+            }
+
             ROS_INFO_STREAM("GPS Mode.");
             geometry_msgs::PoseStamped out_gps_msg;
             out_gps_msg = gps_msg_;
             out_gps_msg.header.stamp = laserCloudMsg->header.stamp; // 寻找最近的时间戳
             pub_gps_msgs_.publish(out_gps_msg);
         }else{
+
+            ROS_INFO_STREAM("SLAM Mode.");
 
 
         for (int i = 0; i < LIVOX_NUM_MAX; ++i) {
@@ -616,10 +633,11 @@ public:
         arr_livox_cali_info[1] = {-0.5, -0.29, 0, 0, 0, (-136.0/180.0) * M_PI};
         arr_livox_cali_info[2] = {-0.5, -0.29, 0, 0, 0, (-136.0/180.0) * M_PI - 0.167 * M_PI};
 
-        is_gps_available_ = true;
+        is_gps_available_ = false;
         gps_x_ = 0;
         gps_y_ = 0;
         gps_phi_ = 0;
+        dropout_count_ = 0;
 
         std::cout << "~~~~~ End ~~~~~" << endl;
     }
