@@ -735,7 +735,7 @@ public:
 
         int clutter_size = projection_scan_3d_2d(*laserCloudIn, scan_id_index);
         compute_features();
-        if (clutter_size == 0) {
+        if (clutter_size <= 0) {
             return laserCloudScans;
         } else {
             split_laser_scan(clutter_size, *laserCloudIn, scan_id_index, laserCloudScans);

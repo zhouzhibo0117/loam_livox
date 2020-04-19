@@ -2,8 +2,10 @@
     
     <param name="scan_line" type="int" value="16" />
     <param name="lidar_type" type="string" value="livox" />
+
     <!-- if 1, do mapping 10 Hz, if 2, do mapping 5 Hz. Suggest to use 1, it will adjust frequence automaticlly -->
     <param name="mapping_skip_frame" type="int" value="1" />
+
     <param name="mapping_init_accumulate_frames" type="int" value="50" />
 
     <!--Debug save file option-->
@@ -28,7 +30,6 @@
     <param name="if_motion_deblur" type="int" value="0"/>
     <param name="odom_mode" type="int" value="0"/>   <!--0 = odom, 1 = mapping-->
     <param name="maximum_mapping_buffer" type="int" value="2"/>
-
 
     <node pkg="loam_livox" type="livox_scanRegistration" name="livox_scanRegistration" output="screen" >
      <remap from="/laser_points" to="/livox/hub_all" />

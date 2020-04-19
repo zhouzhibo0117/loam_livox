@@ -45,6 +45,7 @@
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
+#include <pcl/common/transforms.h>
 #include <ros/ros.h>
 #include <sensor_msgs/Imu.h>
 #include <sensor_msgs/NavSatFix.h>
@@ -120,27 +121,47 @@ public:
     pcl::PointCloud<pcl::PointXYZI>::Ptr laserCloudInAll[LIVOX_NUM_MAX];
 
     // Calibration config.
-    struct CalibrationInfo {
-        double x;
-        double y;
-        double z;
-        double rx;
-        double ry;
-        double rz;
-    };
-    CalibrationInfo arr_livox_cali_info[LIVOX_NUM_MAX];
+//    struct CalibrationInfo {
+//        double x;
+//        double y;
+//        double z;
+//        double rx;
+//        double ry;
+//        double rz;
+//    };
+//    CalibrationInfo arr_livox_cali_info[LIVOX_NUM_MAX];
     std::vector<int> livox_id_index_vec;
 
+    std::vector<std::vector<double>> cali_info; // (x,y,z,yaw,pitch,roll) (unit: m; rad)
+
+    std::vector<Eigen::Matrix3d> rot_mat;
+
+    std::vector<Eigen::Matrix3d> inv_rot_mat;
+
+    std::vector<Eigen::Matrix4d> tran_mat;
+    std::vector<Eigen::Matrix4d> inv_tran_mat;
+
+    std::vector<double> cali_left;
+    std::vector<double> cali_right ;
+    Eigen::Matrix3d rotation_matrix_left;
+    Eigen::Matrix3d inv_rotation_matrix_left;
+    Eigen::Matrix4d tfmat_left ;
+    Eigen::Matrix4d inv_tfmat_left;
+    Eigen::Matrix3d rotation_matrix_right;
+    Eigen::Matrix3d inv_rotation_matrix_right;
+    Eigen::Matrix4d tfmat_right ;
+    Eigen::Matrix4d inv_tfmat_right ;
+
     // GPS & IMU info.
-    double gps_x_;
-    double gps_y_;
-    double gps_phi_;
-    geometry_msgs::PoseStamped gps_msg_;
-    ros::Publisher pub_gps_msgs_;
-    ros::Subscriber sub_gps_msgs_;
-    ros::Subscriber sub_cmd_msgs_;
-    bool is_gps_available_;
-    unsigned dropout_count_;
+//    double gps_x_;
+//    double gps_y_;
+//    double gps_phi_;
+//    geometry_msgs::PoseStamped gps_msg_;
+//    ros::Publisher pub_gps_msgs_;
+//    ros::Subscriber sub_gps_msgs_;
+//    ros::Subscriber sub_cmd_msgs_;
+//    bool is_gps_available_;
+//    unsigned dropout_count_;
 
     int init_ros_env() {
         ros::NodeHandle nh;
@@ -185,11 +206,11 @@ public:
         m_pub_pc_livox_surface = nh.advertise<sensor_msgs::PointCloud2>("/pc2_surface", 10000);
         m_pub_pc_livox_full = nh.advertise<sensor_msgs::PointCloud2>("/pc2_full", 10000);
 
-        pub_gps_msgs_ = nh.advertise<geometry_msgs::PoseStamped>("/pc2_gps_msgs", 10000);
-        sub_gps_msgs_ = nh.subscribe<geometry_msgs::PoseStamped>("/vehicle_global_pose", 10000,
-                                                                 &Laser_feature::vehiclePoseHandler, this);
-        sub_cmd_msgs_ = nh.subscribe<std_msgs::Bool>("/cmd_topic_name", 10000,
-                                                                 &Laser_feature::commandHandler, this);
+//        pub_gps_msgs_ = nh.advertise<geometry_msgs::PoseStamped>("/pc2_gps_msgs", 10000);
+//        sub_gps_msgs_ = nh.subscribe<geometry_msgs::PoseStamped>("/vehicle_global_pose", 10000,
+//                                                                 &Laser_feature::vehiclePoseHandler, this);
+//        sub_cmd_msgs_ = nh.subscribe<std_msgs::Bool>("/cmd_topic_name", 10000,
+//                                                                 &Laser_feature::commandHandler, this);
 
         m_voxel_filter_for_surface.setLeafSize(m_plane_resolution / 2, m_plane_resolution / 2, m_plane_resolution / 2);
         m_voxel_filter_for_corner.setLeafSize(m_line_resolution, m_line_resolution, m_line_resolution);
@@ -238,58 +259,58 @@ public:
         cloud_out.is_dense = true;
     }
 
-    void TransfromToLivoxCoordinate(pcl::PointCloud<pcl::PointXYZI>::Ptr &cloud,
-                                    double tx, double ty, double tz,
-                                    double rx, double ry, double rz) {
+//    void TransfromToLivoxCoordinate(pcl::PointCloud<pcl::PointXYZI>::Ptr &cloud,
+//                                    double tx, double ty, double tz,
+//                                    double rx, double ry, double rz) {
+//
+//        for (int i = 0; i < cloud->points.size(); ++i) {
+//            cloud->points[i].x -= tx;
+//            cloud->points[i].y -= ty;
+//            cloud->points[i].z -= tz;
+//
+//            double tempX = cloud->points[i].x;
+//            double tempY = cloud->points[i].y;
+//
+//            cloud->points[i].x = cos(rz) * tempX + sin(rz) * tempY;
+//            cloud->points[i].y = -sin(rz) * tempX + cos(rz) * tempY;
+//
+//        }
+//
+//    }
+//
+//    void TransfromToHubCoordinate(pcl::PointCloud<pcl::PointXYZI>::Ptr &cloud,
+//                                  double tx, double ty, double tz,
+//                                  double rx, double ry, double rz) {
+//
+//        for (int i = 0; i < cloud->points.size(); ++i) {
+//            double tempX = cloud->points[i].x;
+//            double tempY = cloud->points[i].y;
+//
+//            cloud->points[i].x = cos(rz) * tempX - sin(rz) * tempY + tx;
+//            cloud->points[i].y = sin(rz) * tempX + cos(rz) * tempY + ty;
+//            cloud->points[i].z += tz;
+//
+//        }
+//
+//    }
 
-        for (int i = 0; i < cloud->points.size(); ++i) {
-            cloud->points[i].x -= tx;
-            cloud->points[i].y -= ty;
-            cloud->points[i].z -= tz;
-
-            double tempX = cloud->points[i].x;
-            double tempY = cloud->points[i].y;
-
-            cloud->points[i].x = cos(rz) * tempX + sin(rz) * tempY;
-            cloud->points[i].y = -sin(rz) * tempX + cos(rz) * tempY;
-
-        }
-
-    }
-
-    void TransfromToHubCoordinate(pcl::PointCloud<pcl::PointXYZI>::Ptr &cloud,
-                                  double tx, double ty, double tz,
-                                  double rx, double ry, double rz) {
-
-        for (int i = 0; i < cloud->points.size(); ++i) {
-            double tempX = cloud->points[i].x;
-            double tempY = cloud->points[i].y;
-
-            cloud->points[i].x = cos(rz) * tempX - sin(rz) * tempY + tx;
-            cloud->points[i].y = sin(rz) * tempX + cos(rz) * tempY + ty;
-            cloud->points[i].z += tz;
-
-        }
-
-    }
-
-    void commandHandler(const std_msgs::BoolConstPtr &cmdMsg)
-    {
-        is_gps_available_ = cmdMsg->data;
-    }
-
-    void vehiclePoseHandler(const geometry_msgs::PoseStampedConstPtr &poseMsg)
-    {
-        gps_msg_ = *poseMsg;
-
-        if(!is_gps_available_){
-            geometry_msgs::PoseStamped out_gps_msg;
-            out_gps_msg = gps_msg_;
-            out_gps_msg.header.stamp = poseMsg->header.stamp; // 寻找最近的时间戳
-            pub_gps_msgs_.publish(out_gps_msg);
-
-        }
-    }
+//    void commandHandler(const std_msgs::BoolConstPtr &cmdMsg)
+//    {
+//        is_gps_available_ = cmdMsg->data;
+//    }
+//
+//    void vehiclePoseHandler(const geometry_msgs::PoseStampedConstPtr &poseMsg)
+//    {
+//        gps_msg_ = *poseMsg;
+//
+//        if(!is_gps_available_){
+//            geometry_msgs::PoseStamped out_gps_msg;
+//            out_gps_msg = gps_msg_;
+//            out_gps_msg.header.stamp = poseMsg->header.stamp; // 寻找最近的时间戳
+//            pub_gps_msgs_.publish(out_gps_msg);
+//
+//        }
+//    }
 
     // Lidar数据的回调函数，处理单帧lidar数据。
     void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg) {
@@ -307,22 +328,23 @@ public:
                 return;
         }
 
-        if (is_gps_available_)
-        {
-            dropout_count_++;
-            if(dropout_count_%2 !=0){
-                std::cout<<" Dropout! \n";
-                return;
-            }
-
-            ROS_INFO_STREAM("GPS Mode.");
-            geometry_msgs::PoseStamped out_gps_msg;
-            out_gps_msg = gps_msg_;
-            out_gps_msg.header.stamp = laserCloudMsg->header.stamp; // 寻找最近的时间戳
-            pub_gps_msgs_.publish(out_gps_msg);
-        }else{
-
-            ROS_INFO_STREAM("SLAM Mode.");
+//        if (is_gps_available_)
+//        {
+//            dropout_count_++;
+//            if(dropout_count_%2 !=0){
+//                std::cout<<" Dropout! \n";
+//                return;
+//            }
+//
+//            ROS_INFO_STREAM("GPS Mode.");
+//            geometry_msgs::PoseStamped out_gps_msg;
+//            out_gps_msg = gps_msg_;
+//            out_gps_msg.header.stamp = laserCloudMsg->header.stamp; // 寻找最近的时间戳
+//            pub_gps_msgs_.publish(out_gps_msg);
+//        }else
+//            {
+//
+//            ROS_INFO_STREAM("SLAM Mode.");
 
 
         for (int i = 0; i < LIVOX_NUM_MAX; ++i) {
@@ -336,20 +358,44 @@ public:
             float raw_intensity = laserCloudIn->points[i].intensity;
             int livox_id = round((raw_intensity - float(int(raw_intensity))) * 1000);
 
-            // Transfrom to Livox coordinate.
-            laserCloudIn->points[i].z -= arr_livox_cali_info[livox_id].z;
 
-            double tempX = laserCloudIn->points[i].x - arr_livox_cali_info[livox_id].x;
-            double tempY = laserCloudIn->points[i].y - arr_livox_cali_info[livox_id].y;
-
-            laserCloudIn->points[i].x =
-                    cos(arr_livox_cali_info[livox_id].rz) * tempX + sin(arr_livox_cali_info[livox_id].rz) * tempY;
-            laserCloudIn->points[i].y =
-                    -sin(arr_livox_cali_info[livox_id].rz) * tempX + cos(arr_livox_cali_info[livox_id].rz) * tempY;
+//            // Transfrom to Livox coordinate.
+//            laserCloudIn->points[i].z -= arr_livox_cali_info[livox_id].z;
+//
+//            double tempX = laserCloudIn->points[i].x - arr_livox_cali_info[livox_id].x;
+//            double tempY = laserCloudIn->points[i].y - arr_livox_cali_info[livox_id].y;
+//
+//            laserCloudIn->points[i].x =
+//                    cos(arr_livox_cali_info[livox_id].rz) * tempX + sin(arr_livox_cali_info[livox_id].rz) * tempY;
+//            laserCloudIn->points[i].y =
+//                    -sin(arr_livox_cali_info[livox_id].rz) * tempX + cos(arr_livox_cali_info[livox_id].rz) * tempY;
 
             laserCloudInAll[livox_id]->push_back(laserCloudIn->points[i]);
 
         }
+
+            // 坐标变换到mid40坐标系下
+//        pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_temp(new pcl::PointCloud<pcl::PointXYZI>());
+        for(int i=0;i<4;++i) {
+            for(int j=0;j<3;++j) {
+                pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_temp(new pcl::PointCloud<pcl::PointXYZI>());
+                pcl::transformPointCloud(*laserCloudInAll[livox_id_index_vec[3*i+j]], *cloud_temp, inv_tran_mat[i]);
+                laserCloudInAll[livox_id_index_vec[3*i+j]] = cloud_temp;
+            }
+        }
+
+        for(int i=0;i<4;++i) {
+            pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_temp1(new pcl::PointCloud<pcl::PointXYZI>());
+            pcl::transformPointCloud(*laserCloudInAll[livox_id_index_vec[3*i]], *cloud_temp1, inv_tfmat_left);
+            laserCloudInAll[livox_id_index_vec[3*i]] = cloud_temp1;
+            pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_temp2(new pcl::PointCloud<pcl::PointXYZI>());
+            pcl::transformPointCloud(*laserCloudInAll[livox_id_index_vec[3*i+2]], *cloud_temp2, inv_tfmat_right);
+            laserCloudInAll[livox_id_index_vec[3*i+2]] = cloud_temp2;
+        }
+//        cloud_temp->clear();
+
+
+
 
 //        laserCloudInAll[livox_count] = laserCloudInSingle;
 //        livox_count++;
@@ -372,7 +418,7 @@ public:
             livox_full_all[i].reset(new pcl::PointCloud<PointType>());
         }
 
-
+//        std::cout<<"*** flag 1 ***\n";
         for (int iter = 0; iter < LIVOX_NUM; ++iter) {
 
             int livox_id = livox_id_index_vec[iter];
@@ -403,7 +449,6 @@ public:
             // 将点云分线到不同的laserCloudScans。livox和传统velodyne的方式有所不同。
             laserCloudScans = m_livox.extract_laser_features(laserCloudInAll[livox_id],
                                                              laserCloudMsg->header.stamp.toSec());
-
 
             if (laserCloudScans.empty()) // less than 5 scan
             {
@@ -478,6 +523,7 @@ public:
                                          *livox_full_all[iter],
                                          piece_wise_start[i],
                                          piece_wise_end[i]);
+
                 }
 
 //                for (int i = 0; i < piece_wise; i++) {
@@ -494,40 +540,112 @@ public:
 
 
 
-            // TODO: 坐标变换回去
-            TransfromToHubCoordinate(livox_corners_all[iter],
-                                     arr_livox_cali_info[livox_id].x,
-                                     arr_livox_cali_info[livox_id].y,
-                                     arr_livox_cali_info[livox_id].z,
-                                     arr_livox_cali_info[livox_id].rx,
-                                     arr_livox_cali_info[livox_id].ry,
-                                     arr_livox_cali_info[livox_id].rz);
 
-            TransfromToHubCoordinate(livox_surface_all[iter],
-                                     arr_livox_cali_info[livox_id].x,
-                                     arr_livox_cali_info[livox_id].y,
-                                     arr_livox_cali_info[livox_id].z,
-                                     arr_livox_cali_info[livox_id].rx,
-                                     arr_livox_cali_info[livox_id].ry,
-                                     arr_livox_cali_info[livox_id].rz);
-
-            TransfromToHubCoordinate(livox_full_all[iter],
-                                     arr_livox_cali_info[livox_id].x,
-                                     arr_livox_cali_info[livox_id].y,
-                                     arr_livox_cali_info[livox_id].z,
-                                     arr_livox_cali_info[livox_id].rx,
-                                     arr_livox_cali_info[livox_id].ry,
-                                     arr_livox_cali_info[livox_id].rz);
-
-            // 叠加livox_corners_all[].
-            *livox_full += *livox_full_all[iter];
-            *livox_surface += *livox_surface_all[iter];
-            *livox_corners += *livox_corners_all[iter];
+//            // TODO: 坐标变换回去
+//            Transfro2mToHubCoordinate(livox_corners_all[iter],
+//                                     arr_livox_cali_info[livox_id].x,
+//                                     arr_livox_cali_info[livox_id].y,
+//                                     arr_livox_cali_info[livox_id].z,
+//                                     arr_livox_cali_info[livox_id].rx,
+//                                     arr_livox_cali_info[livox_id].ry,
+//                                     arr_livox_cali_info[livox_id].rz);
+//
+//            TransfromTo2HubCoordinate(livox_surface_all[iter],
+//                                     arr_livox_cali_info[livox_id].x,
+//                                     arr_livox_cali_info[livox_id].y,
+//                                     arr_livox_cali_info[livox_id].z,
+//                                     arr_livox_cali_info[livox_id].rx,
+//                                     arr_livox_cali_info[livox_id].ry,
+//                                     arr_livox_cali_info[livox_id].rz);
+//
+//            Transfro2mToHubCoordinate(livox_full_all[iter],
+//                                     arr_livox_cali_info[livox_id].x,
+//                                     arr_livox_cali_info[livox_id].y,
+//                                     arr_livox_cali_info[livox_id].z,
+//                                     arr_livox_cali_info[livox_id].rx,
+//                                     arr_livox_cali_info[livox_id].ry,
+//                                     arr_livox_cali_info[livox_id].rz);
+//
+//            // 叠加livox_corners_all[].
+//            *livox_full += *livox_full_all[iter];
+//            *livox_surface += *livox_surface_all[iter];
+//            *livox_corners += *livox_corners_all[iter];
 
         }
 
+//        std::cout<<"*** flag 2 ***\n";
+        for(int i=0;i<4;++i) {
 
-        if (livox_surface->points.size() > 0 &&
+            if(livox_full_all[3*i]->points.size()>0){
+                pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_temp(new pcl::PointCloud<pcl::PointXYZI>());
+                pcl::transformPointCloud(*livox_full_all[3*i], *cloud_temp, tfmat_left);
+                livox_full_all[3*i] = cloud_temp;
+            }
+            if(livox_surface_all[3*i]->points.size()>0){
+                pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_temp(new pcl::PointCloud<pcl::PointXYZI>());
+                pcl::transformPointCloud(*livox_surface_all[3*i], *cloud_temp, tfmat_left);
+                livox_surface_all[3*i] = cloud_temp;
+            }
+            if(livox_corners_all[3*i]->points.size()>0){
+                pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_temp(new pcl::PointCloud<pcl::PointXYZI>());
+                pcl::transformPointCloud(*livox_corners_all[3*i], *cloud_temp, tfmat_left);
+                livox_corners_all[3*i] = cloud_temp;
+            }
+
+            if(livox_full_all[3*i+2]->points.size()>0){
+                pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_temp(new pcl::PointCloud<pcl::PointXYZI>());
+                pcl::transformPointCloud(*livox_full_all[3*i+2], *cloud_temp, tfmat_right);
+                livox_full_all[3*i+2] = cloud_temp;
+            }
+            if(livox_surface_all[3*i+2]->points.size()>0){
+                pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_temp(new pcl::PointCloud<pcl::PointXYZI>());
+                pcl::transformPointCloud(*livox_surface_all[3*i+2], *cloud_temp, tfmat_right);
+                livox_surface_all[3*i+2] = cloud_temp;
+            }
+            if(livox_corners_all[3*i+2]->points.size()>0){
+                pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_temp(new pcl::PointCloud<pcl::PointXYZI>());
+                pcl::transformPointCloud(*livox_corners_all[3*i+2], *cloud_temp, tfmat_right);
+                livox_corners_all[3*i+2] = cloud_temp;
+            }
+
+        }
+
+//        std::cout<<"*** flag 3 ***\n";
+
+        for(int i=0;i<4;++i) {
+            for(int j=0;j<3;++j) {
+
+                if(livox_full_all[3*i+j]->points.size()>0){
+                    pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_temp(new pcl::PointCloud<pcl::PointXYZI>());
+                    pcl::transformPointCloud(*livox_full_all[3*i+j], *cloud_temp, tran_mat[i]);
+                    livox_full_all[3*i+j] = cloud_temp;
+
+                    *livox_full += *livox_full_all[3*i+j];
+                }
+                if(livox_surface_all[3*i+j]->points.size()>0){
+                    pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_temp(new pcl::PointCloud<pcl::PointXYZI>());
+                    pcl::transformPointCloud(*livox_surface_all[3*i+j], *cloud_temp, tran_mat[i]);
+                    livox_surface_all[3*i+j] = cloud_temp;
+
+                    *livox_surface += *livox_surface_all[3*i+j];
+                }
+                if(livox_corners_all[3*i+j]->points.size()>0){
+                    pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_temp(new pcl::PointCloud<pcl::PointXYZI>());
+                    pcl::transformPointCloud(*livox_corners_all[3*i+j], *cloud_temp, tran_mat[i]);
+                    livox_corners_all[3*i+j] = cloud_temp;
+
+                    *livox_corners += *livox_corners_all[3*i+j];
+                }
+
+
+            }
+        }
+
+//        std::cout<<"*** flag 4 ***\n";
+
+//        std::cout<<"size  "<<livox_surface->points.size()<<"  "<<livox_corners->points.size()<<"  "<<livox_full->points.size()<<'\n';
+
+            if (livox_surface->points.size() > 0 &&
             livox_corners->points.size() > 0 &&
             livox_full->points.size() > 10) {
 
@@ -538,29 +656,30 @@ public:
             temp_out_msg.header.frame_id = "/camera_init";
             m_pub_pc_livox_full.publish(temp_out_msg);
 
-            pcl::PointCloud<PointType>::Ptr tmpSurface(new pcl::PointCloud<PointType>());
-            m_voxel_filter_for_surface.setInputCloud(livox_surface);
-            m_voxel_filter_for_surface.filter(*tmpSurface);
-            livox_surface->clear();
-            livox_surface=tmpSurface;
+//            pcl::PointCloud<PointType>::Ptr tmpSurface(new pcl::PointCloud<PointType>());
+//            m_voxel_filter_for_surface.setInputCloud(livox_surface);
+//            m_voxel_filter_for_surface.filter(*tmpSurface);
+//            livox_surface->clear();
+//            livox_surface=tmpSurface;
             pcl::toROSMsg(*livox_surface, temp_out_msg);
             temp_out_msg.header.stamp = ros::Time().fromSec(timestamp);
             temp_out_msg.header.frame_id = "/camera_init";
             m_pub_pc_livox_surface.publish(temp_out_msg);
 
-            pcl::PointCloud<PointType>::Ptr tmpCorner(new pcl::PointCloud<PointType>());
-            m_voxel_filter_for_corner.setInputCloud(livox_corners);
-            m_voxel_filter_for_corner.filter(*tmpCorner);
-            livox_corners->clear();
-            livox_corners=tmpCorner;
+//            pcl::PointCloud<PointType>::Ptr tmpCorner(new pcl::PointCloud<PointType>());
+//            m_voxel_filter_for_corner.setInputCloud(livox_corners);
+//            m_voxel_filter_for_corner.filter(*tmpCorner);
+//            livox_corners->clear();
+//            livox_corners=tmpCorner;
             pcl::toROSMsg(*livox_corners, temp_out_msg);
             temp_out_msg.header.stamp = ros::Time().fromSec(timestamp);
             temp_out_msg.header.frame_id = "/camera_init";
             m_pub_pc_livox_corners.publish(temp_out_msg);
         }
 
+//        std::cout<<"*** flag 5 ***\n";
 
-       }
+
     }
 
     void init_livox_lidar_para() {
@@ -595,51 +714,99 @@ public:
 
 
         // Livov id index vector.
-        livox_id_index_vec.push_back(24); // left front
-        livox_id_index_vec.push_back(25);
-        livox_id_index_vec.push_back(26);
-        livox_id_index_vec.push_back(18); // right front
+        livox_id_index_vec.push_back(15); //front_right
+        livox_id_index_vec.push_back(16);
+        livox_id_index_vec.push_back(17);
+        livox_id_index_vec.push_back(18); // front_left
         livox_id_index_vec.push_back(19);
         livox_id_index_vec.push_back(20);
-        livox_id_index_vec.push_back(21); // left back
+        livox_id_index_vec.push_back(24); // back_left
+        livox_id_index_vec.push_back(25);
+        livox_id_index_vec.push_back(26);
+        livox_id_index_vec.push_back(21);  //back_right
         livox_id_index_vec.push_back(22);
         livox_id_index_vec.push_back(23);
-        livox_id_index_vec.push_back(0);  // right back
-        livox_id_index_vec.push_back(1);
-        livox_id_index_vec.push_back(2);
-
-        // Calibration init.
-        // arr_livox_cali_info[0] = {0, 0,0, 0, 0,0};
-//        arr_livox_cali_info[0] = {-0.16, -0.16, 0.737 - 0.0737, 0, 0, -0.75 * M_PI};
-//        arr_livox_cali_info[3] = {0.18, -0.18, 0.397 - 0.0397, 0, 0, -0.2417 * M_PI + 0.167 * M_PI};
-//        arr_livox_cali_info[4] = {0.18, -0.18, 0.397 - 0.0397, 0, 0, -0.2417 * M_PI};
-//        arr_livox_cali_info[5] = {0.18, -0.18, 0.397 - 0.0397, 0, 0, -0.2417 * M_PI - 0.167 * M_PI};
-//        arr_livox_cali_info[21] = {-0.16, 0.16, 0.737 - 0.0737, 0, 0, 0.75 * M_PI};
-//        arr_livox_cali_info[24] = {0.18, 0.18, 0.397 - 0.0397, 0, 0, 0.25 * M_PI + 0.167 * M_PI};
-//        arr_livox_cali_info[25] = {0.18, 0.18, 0.397 - 0.0397, 0, 0, 0.25 * M_PI};
-//        arr_livox_cali_info[26] = {0.18, 0.18, 0.397 - 0.0397, 0, 0, 0.25 * M_PI - 0.167 * M_PI};
 
 
-        arr_livox_cali_info[24] = {0.5, 0.29, 0, 0, 0, (43.0/180.0) * M_PI + 0.167 * M_PI};
-        arr_livox_cali_info[25] = {0.5, 0.29, 0, 0, 0, (43.0/180.0) * M_PI};
-        arr_livox_cali_info[26] = {0.5, 0.29, 0, 0, 0, (43.0/180.0) * M_PI - 0.167 * M_PI};
-        arr_livox_cali_info[18] = {0.5, -0.29, 0, 0, 0, (-45.0/180.0) * M_PI + 0.167 * M_PI};
-        arr_livox_cali_info[19] = {0.5, -0.29, 0, 0, 0, (-45.0/180.0) * M_PI};
-        arr_livox_cali_info[20] = {0.5, -0.29, 0, 0, 0, (-45.0/180.0) * M_PI - 0.167 * M_PI};
-        arr_livox_cali_info[21] = {-0.5, 0.29, 0, 0, 0, (132.0/180.0) * M_PI + 0.167 * M_PI};
-        arr_livox_cali_info[22] = {-0.5, 0.29, 0, 0, 0, (132.0/180.0) * M_PI};
-        arr_livox_cali_info[23] = {-0.5, 0.29, 0, 0, 0, (132.0/180.0) * M_PI - 0.167 * M_PI};
-        arr_livox_cali_info[0] = {-0.5, -0.29, 0, 0, 0, (-136.0/180.0) * M_PI + 0.167 * M_PI};
-        arr_livox_cali_info[1] = {-0.5, -0.29, 0, 0, 0, (-136.0/180.0) * M_PI};
-        arr_livox_cali_info[2] = {-0.5, -0.29, 0, 0, 0, (-136.0/180.0) * M_PI - 0.167 * M_PI};
+        // front_right
+        std::vector<double> cali_info_1 = {0.592, -0.35, 1.73, -36.69 / 180.0 * M_PI, -1.51 / 180.0 * M_PI,
+                                           0.9 / 180.0 * M_PI};
+        // front_left
+        std::vector<double> cali_info_2 = {0.56, 0.4, 1.73, 34.3 / 180.0 * M_PI, -1.5 / 180.0 * M_PI,
+                                           -0.4 / 180.0 * M_PI};
+        // back_left
+        std::vector<double> cali_info_3 = {0.105, 0.492, 1.73, 122.16 / 180.0 * M_PI, 0.24 / 180.0 * M_PI,
+                                           -0.81 / 180.0 * M_PI};
+        // back_right
+        std::vector<double> cali_info_4 = {0.087, -0.4, 1.73, 235 / 180.0 * M_PI, -0.75 / 180.0 * M_PI,
+                                           0.75 / 180.0 * M_PI};
 
-        is_gps_available_ = false;
-        gps_x_ = 0;
-        gps_y_ = 0;
-        gps_phi_ = 0;
-        dropout_count_ = 0;
+        cali_info.push_back(cali_info_1);
+        cali_info.push_back(cali_info_2);
+        cali_info.push_back(cali_info_3);
+        cali_info.push_back(cali_info_4);
+
+
+        for (int k = 0; k < 4; ++k) {
+
+            Eigen::Matrix3d rotation_matrix;
+            Eigen::Matrix3d inv_rotation_matrix;
+            Eigen::Matrix4d tfmat = Eigen::Matrix4d::Identity();
+            Eigen::Matrix4d inv_tfmat = Eigen::Matrix4d::Identity();
+
+            GetTransformResult(cali_info[k], rotation_matrix, inv_rotation_matrix, tfmat, inv_tfmat);
+
+            rot_mat.push_back(rotation_matrix);
+            inv_rot_mat.push_back(inv_rotation_matrix);
+            tran_mat.push_back(tfmat);
+            inv_tran_mat.push_back(inv_tfmat);
+
+        }
+
+        cali_left = {-0.0148, 0.066, 0, 30.0 / 180.0 * M_PI, 0.0, 0.0};
+        cali_right = {-0.0148, -0.066, 0, -30.0 / 180.0 * M_PI, 0.0, 0.0};
+        tfmat_left = Eigen::Matrix4d::Identity();
+        inv_tfmat_left = Eigen::Matrix4d::Identity();
+        tfmat_right = Eigen::Matrix4d::Identity();
+        inv_tfmat_right = Eigen::Matrix4d::Identity();
+
+        GetTransformResult(cali_left, rotation_matrix_left, inv_rotation_matrix_left, tfmat_left, inv_tfmat_left);
+        GetTransformResult(cali_right, rotation_matrix_right, inv_rotation_matrix_right, tfmat_right, inv_tfmat_right);
+
+
+//        is_gps_available_ = false;
+//        gps_x_ = 0;
+//        gps_y_ = 0;
+//        gps_phi_ = 0;
+//        dropout_count_ = 0;
 
         std::cout << "~~~~~ End ~~~~~" << endl;
+    }
+
+    void GetTransformResult(const std::vector<double> &cali_vec, Eigen::Matrix3d &rotation_matrix,
+                            Eigen::Matrix3d &inv_rotation_matrix, Eigen::Matrix4d &tfmat, Eigen::Matrix4d &inv_tfmat) {
+        Eigen::Vector3d translation(cali_vec[0], cali_vec[1], cali_vec[2]);
+        Eigen::Vector3d eulerAngle(cali_vec[3], cali_vec[4], cali_vec[5]);
+        Eigen::AngleAxisd yawAngle(Eigen::AngleAxisd(eulerAngle(0), Eigen::Vector3d::UnitZ()));
+        Eigen::AngleAxisd pitchAngle(Eigen::AngleAxisd(eulerAngle(1), Eigen::Vector3d::UnitY()));
+        Eigen::AngleAxisd rollAngle(Eigen::AngleAxisd(eulerAngle(2), Eigen::Vector3d::UnitX()));
+
+        rotation_matrix = yawAngle * pitchAngle * rollAngle;
+        inv_rotation_matrix = rotation_matrix.inverse();
+        Eigen::Vector3d inv_translation = -inv_rotation_matrix * translation;
+
+        for (int i = 0; i < 3; ++i)
+            for (int j = 0; j < 3; ++j) {
+                tfmat(i, j) = rotation_matrix(i, j);
+                inv_tfmat(i, j) = inv_rotation_matrix(i, j);
+            }
+
+
+        for (int i = 0; i < 3; ++i) {
+            tfmat(i, 3) = translation(i);
+            inv_tfmat(i, 3) = inv_translation(i);
+        }
+
     }
 };
 

@@ -9,7 +9,6 @@ Panels:
         - /Axes1
         - /odometry1/odomPath1
         - /odometry1/PointCloud21
-        - /mapping1
         - /mapping1/surround1
         - /mapping1/currPoints1
         - /Debug1/PointCloud21
@@ -244,8 +243,8 @@ Visualization Manager:
         - Alpha: 1
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
-            Max Value: 26.2531872
-            Min Value: -2.44099998
+            Max Value: 28.2574043
+            Min Value: -2.65765023
             Value: true
           Axis: Z
           Channel Name: intensity
@@ -451,7 +450,7 @@ Visualization Manager:
               Value: true
             Value: true
           Enabled: true
-          Keep: 1000
+          Keep: 1000000
           Name: Odometry
           Position Tolerance: 0.00100000005
           Shape:
@@ -686,15 +685,15 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/ThirdPersonFollower
-      Distance: 52.9913292
+      Distance: 153.043472
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.0599999987
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 2.48753357
-        Y: -0.747770607
+        X: 47.7858734
+        Y: -1.63847733
         Z: 4.34871754e-06
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.0500000007
